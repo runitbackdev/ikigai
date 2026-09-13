@@ -2,8 +2,9 @@
 
 What Ikigai works around that belongs in COSMIC, and what it would take to fix there.
 Each entry: the symptom, where the workaround lives, the fix, and the size. Ordered by
-what a fork would earn first. Started 2026-09-13; versions are cosmic-comp 1.7.0 and
-xdg-desktop-portal-cosmic 1.7.0 unless said otherwise.
+what a fork would earn first. Started 2026-09-13; every entry re-checked against epoch-1.8.0 of cosmic-comp,
+xdg-desktop-portal-cosmic and cosmic-settings-daemon (smithay e3d461a, cosmic-protocols
+32283d7) on 2026-09-13, which is what Arch ships and what the runitbackdev forks branch from.
 
 ## cosmic-comp
 
@@ -18,16 +19,18 @@ layer-shell off on any desktop named COSMIC because of the same bug, so its unit
 `XDG_CURRENT_DESKTOP=Ikigai`. Upstream: cosmic-comp#1590 and smithay#1979, both open with
 no movement since 2026-03.
 
-Fix: drop the layer-shell commit hook with the role, or accept a null commit on a surface
-whose role is gone. Small, in Smithay's `wlr_layer` module or cosmic-comp's layer-shell
-handler. Payoff is the biggest on the list: the Qt rebuild machinery and the Vicinae
-drop-in both go.
+Fixed on the fork, 2026-09-13: Smithay `dc10f06c` returns early from the `wlr_layer` and
+`session_lock` pre-commit hooks once the role object is dead, the check Drakulix named as
+acceptable in smithay#1979; cosmic-comp `fee768c8` pins it. `just comp-test` is the proof:
+stock Qt survives six hide/show cycles and two lock cycles under the fork and dies on the
+first of each under stock. Not sent upstream yet. Once the fork is on every box the Qt
+rebuild machinery and the Vicinae drop-in go.
 
 ### `set_focus` ignores exclusive layer surfaces for one frame
 
-`Shell::set_focus` (`src/shell/focus/mod.rs` 191) hands keyboard focus straight to a
+`Shell::set_focus` (`src/shell/focus/mod.rs` 192) hands keyboard focus straight to a
 window. The rule that an exclusive layer surface owns focus lives only in `refresh_focus`
-(623 onward), which runs once per loop and takes it back. Any activate request while an
+(`focus_target_is_valid`, 624 onward), which runs once per loop and takes it back. Any activate request while an
 exclusive overlay is up, a late one from the shell's own switch or an app raising itself,
 gives the overlay a keyboard leave and enter a few milliseconds apart. The Alt+Tab card
 used to read the leave as "something took over" and cancel; since 2026-09-13 it ignores
@@ -54,13 +57,15 @@ With nothing focused it never does, and the password field would need a click.
 
 Fix: set focus to the lock surface when the lock takes effect. Small.
 
-### The pointer is painted into captures whatever the client asked
+### The pointer is painted into captures whatever the client asked (unconfirmed)
 
-ext-image-copy-capture lets the client say whether cursors go in. cosmic-comp paints the
-pointer regardless, so `shell/Shot.qml` maps a blank-cursor overlay on every screen
-before grim runs.
-
-Fix: honour the session's cursor option in the capture path. Small.
+ext-image-copy-capture lets the client say whether cursors go in, and `shell/Shot.qml`
+maps a blank-cursor overlay on every screen before grim runs on the assumption that
+cosmic-comp ignores it. The code says otherwise: `image_copy_capture/render.rs` 432 reads
+`session.draw_cursor()` and picks `CursorMode::None` without it, in 1.7.0 and 1.8.0 alike,
+and grim 1.5.0 only sets `paint_cursors` with `-c`. A `grim` versus `grim -c` diff on
+2026-09-13 showed no cursor either. Re-test with the overlay removed and the pointer parked
+on a still screen before writing anything; the workaround may simply be unnecessary.
 
 ### A failed page flip on wake rewrites the output config
 
@@ -68,8 +73,9 @@ On NVIDIA (610.57 open) a DisplayPort monitor leaves the bus when it sleeps and 
 is a hotplug. cosmic-comp's first page flip after the modeset fails with EINVAL,
 `Config::read_outputs` logs "Failed to switch primary-plane scanout flags", the outputs
 are written Disabled, the next pass logs "Broken config, all outputs disabled" and
-generates preferred modes at 60 Hz in connector order into `outputs.ron`. Master has the
-same code. `ikigai-outputs` (`session/src/bin/ikigai-outputs.rs`) remembers the layout and
+generates preferred modes at 60 Hz in connector order into `outputs.ron`. 1.8.0 has the
+same code (`config/mod.rs` 404, `backend/kms/mod.rs` 1246); its only change here sorts
+the fallback layout by connector name. `ikigai-outputs` (`session/src/bin/ikigai-outputs.rs`) remembers the layout and
 puts it back.
 
 Fix: retry the flip before declaring the config broken, and never persist a config the
@@ -108,12 +114,12 @@ here; a feature, not a fix.
 
 Share a window in Discord and close that window: the stream stays up on the last frame.
 cosmic-comp sends `stopped` on the capture session; the portal's handler
-(`src/wayland/mod.rs` 724, "TODO signal users of session in some way?") sets a flag and
+(`src/wayland/mod.rs` 724, "TODO signal users of session in some way?", unchanged in 1.8.0) sets a flag and
 the PipeWire thread quits, but nothing emits `Closed` on the
 `org.freedesktop.impl.portal.Session` object. `closed` is only sent from the `Close`
 method (`src/main.rs` 122), so the frontend never tells the app and Chromium's capturer
 treats "no frame" as temporary. GNOME and KDE emit `Closed` here. PR #291 (merged
-2026-04-01, in 1.7.0) made the portal survive the event instead of crashing and left
+2026-04-01) made the portal survive the event instead of crashing and left
 this. No issue filed.
 
 Fix, about 40 lines: give `ScreencastThread` a stopped notification (a oneshot fired in
@@ -125,6 +131,6 @@ rather than `stream.disconnect()`, which the PR notes segfaults.
 
 ## cosmic-settings-daemon
 
-"Failed to sync with greeter" on every start: it writes state for cosmic-greeter and
+"Failed to sync with greeter" (`src/main.rs` 495) on every start: it writes state for cosmic-greeter and
 Ikigai's greeter reads nothing there. Noise only. A patch would make the greeter sync
 optional or quiet when the greeter directory is absent.

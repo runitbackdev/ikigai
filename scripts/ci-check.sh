@@ -15,8 +15,16 @@ done
 echo "syntax ok"
 
 eval "$(sed -n '/^PACMAN=(/,/^)/p' install/packages.sh)"
-pacman -Sp --noconfirm "${PACMAN[@]}" >/dev/null
-echo "all ${#PACMAN[@]} repo packages resolve"
+official=(); ours=()
+for p in "${PACMAN[@]}"; do case "$p" in *-ikigai) ours+=("$p") ;; *) official+=("$p") ;; esac; done
+pacman -Sp --noconfirm "${official[@]}" >/dev/null
+echo "all ${#official[@]} repo packages resolve"
+# Ikigai's own packages come from packages/<name>/PKGBUILD (built by packages.yml).
+for p in "${ours[@]}"; do
+  f="packages/${p%-ikigai}/PKGBUILD"
+  bash -n "$f" && grep -q "^pkgname=$p\$" "$f" || { echo "$p: no $f with pkgname=$p"; exit 1; }
+done
+echo "${#ours[@]} ikigai package(s) have a PKGBUILD"
 
 for p in nvidia-open-dkms nvidia-utils linux-headers mesa vulkan-radeon vulkan-intel hyperv; do
   pacman -Si "$p" >/dev/null

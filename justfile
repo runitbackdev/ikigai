@@ -78,7 +78,8 @@ update:
     grep -qE '^(config|icons)/' <<<"$changed" && steps="$steps configs"
     grep -qE '^(themes|cursors)/' <<<"$changed" && steps="$steps theme"
     grep -qE '^greeter/' <<<"$changed" && steps="$steps greeter"
-    grep -qE '^packages/' <<<"$changed" && steps="$steps qt"
+    grep -qE '^packages/qt6-base/' <<<"$changed" && steps="$steps qt"
+    grep -qE '^packages/[^/]+/PKGBUILD' <<<"$changed" && steps="$steps packages"
     grep -qE '^firewall/' <<<"$changed" && steps="$steps firewall"
     steps=$(tr ' ' '\n' <<<"$steps" | grep . | sort -u | tr '\n' ' ')
     echo "installed ${installed:0:7} -> ${head:0:7}; steps: $steps"
@@ -119,6 +120,10 @@ check:
     find themes config -type f \( -name '*.ron' -o -path '*/v[0-9]/*' \) | while read -r f; do grep -q . "$f" || { echo "empty config file: $f"; exit 1; }; done
     python3 -c 'import json, glob; [json.load(open(f)) for f in ["archinstall.json", "config/ikigai/shell.json", "config/zen/policies.json", *glob.glob("themes/*/shell.json")]]'
     echo "configs ok"
+
+# The layer-shell regression test: stock Qt hide/show and lock/unlock under a nested cosmic-comp (`just comp-test target/fastdebug/cosmic-comp`)
+comp-test comp="cosmic-comp":
+    scripts/comp-test.sh {{comp}}
 
 # The full CI check in an archlinux container (needs docker): package names, the Qt patch, everything
 ci:

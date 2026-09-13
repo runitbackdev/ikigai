@@ -1,0 +1,46 @@
+# Build every packages/*/PKGBUILD in an archlinux container and publish them as a pacman
+# repository on the rolling `packages` GitHub release: install/packages.sh points [ikigai]
+# at it. Packages from earlier runs stay in the release; repo-add -R drops superseded
+# versions from the database. Unsigned for now (SigLevel = Optional TrustAll on the client).
+name: packages
+on:
+  push:
+    branches: [main]
+    paths:
+      - packages/*/PKGBUILD
+      - .github/workflows/packages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Build
+        run: |
+          pacman -Syu --noconfirm --needed base-devel git github-cli
+          useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+          chown -R builder .
+          for d in packages/*/; do
+            [ -f "$d/PKGBUILD" ] || continue
+            echo "==> $d"
+            (cd "$d" && sudo -u builder makepkg -s --noconfirm --needed)
+          done
+          mkdir -p repo && mv packages/*/*.pkg.tar.zst repo/
+          ls -la repo
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd repo
+          gh release view packages >/dev/null 2>&1 || gh release create packages --title "Ikigai packages" \
+            --notes "A pacman repository, rebuilt by CI from packages/*/PKGBUILD. Not for humans: install/packages.sh adds it to pacman.conf as [ikigai]."
+          gh release download packages -p '*.pkg.tar.zst' --skip-existing
+          repo-add -R ikigai.db.tar.gz ./*.pkg.tar.zst
+          cp ikigai.db.tar.gz ikigai.db && cp ikigai.files.tar.gz ikigai.files
+          gh release upload packages --clobber ./*.pkg.tar.zst ikigai.db ikigai.db.tar.gz ikigai.files ikigai.files.tar.gz

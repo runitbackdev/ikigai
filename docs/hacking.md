@@ -15,6 +15,7 @@
 | `cursors/bibata` | Bibata's SVG sources, vendored |
 | `icons/` | the Ikigai icon theme and its Phosphor name map |
 | `packages/qt6-base` | the Wayland patch, its rebuild script and pacman hook |
+| `packages/cosmic-comp` | the PKGBUILD for the forked compositor; CI builds it into the `packages` release |
 | `firewall/` | the first-boot unit |
 | `tools/cosmic-theme-gen` | dev-only: builds the COSMIC theme from `builder.ron` |
 | `scripts/` | theme pipeline, vendoring, dev shell, the VMs, CI |
@@ -36,6 +37,7 @@
 | `just theme [name]` | build the theme files and apply them |
 | `just doctor`, `just config-diff` | what is drifted; seeds vs `config/` |
 | `just check` | bash -n, shellcheck, clippy and tests, config sanity |
+| `just comp-test [binary]` | the layer-shell regression test for the compositor fork, nested |
 | `just ci` | the full CI check in an archlinux container |
 | `just vm ...` | the QEMU VM |
 
@@ -56,6 +58,18 @@ cursors, the icon theme, the glyph table, oh-my-zsh's git aliases. Add a row to
 
 shellcheck at warning, and `scripts/ci-check.sh` in an archlinux container: syntax on
 every script and every curated package name resolves in the official repos.
+
+`packages.yml` builds every `packages/*/PKGBUILD` and publishes them as a pacman repository
+on the rolling `packages` GitHub release, which the installer adds as `[ikigai]`. It runs
+when a PKGBUILD changes on main, or by hand from the Actions tab.
+
+## The forks
+
+cosmic-comp and Smithay live at github.com/runitbackdev, branch `ikigai`, cut from the tag
+Arch ships plus one commit per fix ([upstream.md](upstream.md)). To ship a change: commit on
+the fork, push, put the new commit in `packages/cosmic-comp/PKGBUILD` (`_commit`, and bump
+`pkgrel`), and merge to main; CI publishes, `ikigai-update --pkg` installs. Test it first
+with `just comp-test path/to/cosmic-comp` on a nested build.
 
 ## Adding a step
 

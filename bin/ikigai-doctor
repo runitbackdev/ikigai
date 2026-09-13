@@ -66,6 +66,11 @@ for b in "$IKIGAI_PATH"/bin/*; do
   elif ! cmp -s "$b" "/usr/local/bin/$n"; then warn bin "/usr/local/bin/$n differs from bin/$n (just install services)"
   fi
 done
+comp=$(pacman -Q cosmic-comp-ikigai 2>/dev/null | cut -d' ' -f2)
+want=$(. "$IKIGAI_PATH/packages/cosmic-comp/PKGBUILD" 2>/dev/null && echo "$epoch:$pkgver-$pkgrel")
+if [ -z "$comp" ]; then fail comp "stock cosmic-comp $(pacman -Q cosmic-comp 2>/dev/null | cut -d' ' -f2); the fork is not installed (just install packages)"
+elif [ "$comp" = "$want" ]; then ok comp "cosmic-comp-ikigai $comp"
+else warn comp "cosmic-comp-ikigai $comp installed, tree wants $want (ikigai-update --pkg once CI has published it)"; fi
 qt=$(pacman -Q qt6-base 2>/dev/null | cut -d' ' -f2)
 qtstate=$(sudo -n cat /var/lib/ikigai/qt-wayland 2>/dev/null || cat /var/lib/ikigai/qt-wayland 2>/dev/null)
 if [ -z "$qtstate" ]; then fail qt "no /var/lib/ikigai/qt-wayland: Qt Wayland client is stock (layer-shell hide bug)"

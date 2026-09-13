@@ -3,7 +3,7 @@ set -euo pipefail
 
 PACMAN=(
   base-devel git rust rust-src quickshell qt6-shadertools cmake ninja ccache vulkan-headers
-  cosmic-comp cosmic-bg cosmic-settings cosmic-settings-daemon cosmic-idle cosmic-randr
+  cosmic-comp-ikigai cosmic-bg cosmic-settings cosmic-settings-daemon cosmic-idle cosmic-randr
   cosmic-icon-theme cosmic-sound-theme cosmic-files xdg-desktop-portal-cosmic greetd xorg-xwayland
   ghostty zsh zsh-autosuggestions zsh-syntax-highlighting zsh-completions starship
   zed neovim lazygit github-cli just discord
@@ -36,6 +36,15 @@ esac
 
 # 32-bit packages (Steam and its drivers) come from multilib; enable it once, up front.
 sudo sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
+
+# Ikigai's own packages (packages/*/PKGBUILD): CI builds them into a pacman repository on
+# the `packages` GitHub release. Unsigned so far, hence TrustAll.
+if ! grep -q '^\[ikigai\]' /etc/pacman.conf; then
+  printf '\n[ikigai]\nSigLevel = Optional TrustAll\nServer = https://github.com/runitbackdev/ikigai/releases/download/packages\n' | sudo tee -a /etc/pacman.conf >/dev/null
+fi
+# The forked compositor conflicts with Arch's, and --noconfirm answers no to the swap, so
+# the stock package goes first. Its files go; the running compositor does not.
+[ "$(pacman -Qq cosmic-comp 2>/dev/null)" = cosmic-comp ] && sudo pacman -Rdd --noconfirm cosmic-comp
 
 sudo pacman -Syu --needed --noconfirm "${PACMAN[@]}"
 

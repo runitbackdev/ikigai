@@ -52,7 +52,7 @@ your dotfiles are left alone, the greeter takes `display-manager.service`.
 
 ## What's in it
 
-- COSMIC's compositor, Settings, Files and portal. Panel, launcher, notifications, OSD, greeter, lock and polkit are Ikigai's ([docs/shell.md](docs/shell.md)).
+- COSMIC's compositor (Ikigai's fork, [docs/upstream.md](docs/upstream.md)), Settings, Files and portal. Panel, launcher, notifications, OSD, greeter, lock and polkit are Ikigai's ([docs/shell.md](docs/shell.md)).
 - One palette rendered into the shell, COSMIC, GTK, Qt, Ghostty, btop, Vicinae and the cursors ([docs/theme.md](docs/theme.md)).
 - [Vicinae](https://vicinae.com) launcher, [Ghostty](https://ghostty.org) + [zellij](https://zellij.dev), zsh + [starship](https://starship.rs), [Zed](https://zed.dev), Neovim, [Zen](https://zen-browser.app), mpv, cosmic-viewer, Discord, YouTube Music.
 - gh, just, Claude Code, mise, Docker + lazydocker, yazi, lazygit, btop, ripgrep, fd, fzf, bat, eza, dust, delta, tealdeer, jq, plocate, fastfetch.
