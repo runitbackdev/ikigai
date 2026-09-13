@@ -99,6 +99,7 @@ Log out, power off, reboot and sleep are Vicinae commands: `Super`, type the wor
 - [theme.md](docs/theme.md): the palette pipeline
 - [architecture.md](docs/architecture.md): session, greeter, lock, config layering
 - [hacking.md](docs/hacking.md): repo layout, just recipes, the VM
+- [upstream.md](docs/upstream.md): what belongs in COSMIC, and what a fork would fix first
 
 ## Credits
 
