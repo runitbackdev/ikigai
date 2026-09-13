@@ -138,18 +138,16 @@ Scope {
                 focus: true
 
                 readonly property bool active: Window.active
-                property bool wasActive: false
 
                 // A quick tap releases Alt before the overlay exists, so that release never
                 // arrives: on gaining focus, commit at once unless a modifier is still held.
-                // Losing focus to something else (a launcher, a lock) abandons the switch.
+                // Losing focus means nothing: the overlay is exclusive, so only a lock can
+                // keep focus from it, and cosmic-comp hands focus to any window that asks
+                // (a late activate, an app raising itself) for one frame before taking it
+                // back. The release that landed elsewhere is caught the same way on return.
                 onActiveChanged: {
-                    if (active) {
-                        wasActive = true;
+                    if (active)
                         Qt.callLater(keys.commitUnlessHeld);
-                    } else if (wasActive) {
-                        switcher.cancel();
-                    }
                 }
 
                 function commitUnlessHeld() {
