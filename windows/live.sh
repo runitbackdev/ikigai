@@ -11,7 +11,7 @@ param() { sed -n "s/.*[[:space:]]$1=\([^[:space:]]*\).*/\1/p" /proc/cmdline; }
 
 mode="$(param ikigai.mode)"
 ref="${IKIGAI_REF:-$(param ikigai.ref)}"; ref="${ref:-main}"
-raw="${IKIGAI_RAW:-$(param ikigai.raw)}"; raw="${raw:-https://raw.githubusercontent.com/MSILycanthropy/ikigai/$ref}"
+raw="${IKIGAI_RAW:-$(param ikigai.raw)}"; raw="${raw:-https://raw.githubusercontent.com/runitbackdev/ikigai/$ref}"
 label="$(param img_label)"
 
 [ "$(id -u)" = 0 ] || die "run as root"

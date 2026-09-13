@@ -30,6 +30,6 @@
   "ntp": true,
   "hostname": "ikigai",
   "custom_commands": [
-    "f=/etc/sudoers.d/90-ikigai-install; trap 'rm -f $f' EXIT; u=$(getent passwd 1000 | cut -d: -f1) && echo \"$u ALL=(ALL) NOPASSWD: ALL\" > $f && chmod 440 $f && runuser -l \"$u\" -c 'export IKIGAI_PLAIN=1; curl -fsSL https://raw.githubusercontent.com/MSILycanthropy/ikigai/main/boot.sh | bash'"
+    "f=/etc/sudoers.d/90-ikigai-install; trap 'rm -f $f' EXIT; u=$(getent passwd 1000 | cut -d: -f1) && echo \"$u ALL=(ALL) NOPASSWD: ALL\" > $f && chmod 440 $f && runuser -l \"$u\" -c 'export IKIGAI_PLAIN=1; curl -fsSL https://raw.githubusercontent.com/runitbackdev/ikigai/main/boot.sh | bash'"
   ]
 }

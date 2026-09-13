@@ -24,7 +24,7 @@ Ikigai layers onto an Arch install; it does not replace one.
 On Arch already:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/MSILycanthropy/ikigai/main/boot.sh | bash
+curl -fsSL https://raw.githubusercontent.com/runitbackdev/ikigai/main/boot.sh | bash
 ```
 
 From the Arch ISO. archinstall picks the minimal profile, systemd-boot and
@@ -32,13 +32,13 @@ NetworkManager, asks for disk, user, password, locale and timezone, then runs th
 above:
 
 ```sh
-archinstall --config-url https://raw.githubusercontent.com/MSILycanthropy/ikigai/main/archinstall.json
+archinstall --config-url https://raw.githubusercontent.com/runitbackdev/ikigai/main/archinstall.json
 ```
 
 From Windows, no USB stick. Admin PowerShell, Secure Boot and BitLocker off:
 
 ```powershell
-irm https://raw.githubusercontent.com/MSILycanthropy/ikigai/main/boot.ps1 | iex
+irm https://raw.githubusercontent.com/runitbackdev/ikigai/main/boot.ps1 | iex
 ```
 
 It asks replace or dual boot, puts the ISO on a small partition and boots it once.

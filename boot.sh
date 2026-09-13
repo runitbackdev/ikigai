@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# curl -fsSL https://raw.githubusercontent.com/MSILycanthropy/ikigai/main/boot.sh | bash
+# curl -fsSL https://raw.githubusercontent.com/runitbackdev/ikigai/main/boot.sh | bash
 set -euo pipefail
 
-IKIGAI_REPO="${IKIGAI_REPO:-https://github.com/MSILycanthropy/ikigai.git}"
+IKIGAI_REPO="${IKIGAI_REPO:-https://github.com/runitbackdev/ikigai.git}"
 IKIGAI_REF="${IKIGAI_REF:-main}"
 IKIGAI_PATH="${IKIGAI_PATH:-$HOME/.local/share/ikigai}"
 

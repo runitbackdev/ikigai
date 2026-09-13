@@ -1,6 +1,6 @@
 # Ikigai, from Windows.
 #
-#   irm https://raw.githubusercontent.com/MSILycanthropy/ikigai/main/boot.ps1 | iex
+#   irm https://raw.githubusercontent.com/runitbackdev/ikigai/main/boot.ps1 | iex
 #
 # Stages the Arch ISO on a small new partition of this disk and reboots into it once.
 # The ISO then runs windows/live.sh, which runs archinstall (Windows is erased there,
@@ -24,7 +24,7 @@ $Label = 'IKIGAI'
 $StageGB = 2
 $Description = 'Ikigai installer'
 $Mirror = 'https://geo.mirror.pkgbuild.com/iso/latest'
-if (-not $Raw) { $Raw = "https://raw.githubusercontent.com/MSILycanthropy/ikigai/$Ref" }
+if (-not $Raw) { $Raw = "https://raw.githubusercontent.com/runitbackdev/ikigai/$Ref" }
 
 function Step($text) { Write-Host "==> $text" -ForegroundColor Cyan }
 function Note($text) { Write-Host "    $text" -ForegroundColor DarkGray }

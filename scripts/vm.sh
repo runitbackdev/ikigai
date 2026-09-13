@@ -102,7 +102,7 @@ cmd_install() {
   start_qemu -cdrom "$ISO" -boot d
   cat <<MSG
 booted the Arch ISO. In the guest:
-  archinstall --config-url https://raw.githubusercontent.com/MSILycanthropy/ikigai/main/archinstall.json
+  archinstall --config-url https://raw.githubusercontent.com/runitbackdev/ikigai/main/archinstall.json
 or to install from this working tree instead: vm.sh serve, then inside the guest
   archinstall --config-url http://10.0.2.2:${VM_HTTP_PORT:-8642}/archinstall.json
 When it is done: poweroff the guest, then vm.sh seal.
@@ -123,7 +123,7 @@ d = json.load(open(sys.argv[1])); port, ref = sys.argv[3], sys.argv[4]
 d["custom_commands"] = [c.replace(
     "export IKIGAI_PLAIN=1;",
     f"export IKIGAI_PLAIN=1 IKIGAI_REPO=http://10.0.2.2:{port}/ikigai.git IKIGAI_REF={ref};")
-    .replace("https://raw.githubusercontent.com/MSILycanthropy/ikigai/main/boot.sh", f"http://10.0.2.2:{port}/boot.sh")
+    .replace("https://raw.githubusercontent.com/runitbackdev/ikigai/main/boot.sh", f"http://10.0.2.2:{port}/boot.sh")
     for c in d["custom_commands"]]
 json.dump(d, open(sys.argv[2], "w"), indent=2)
 PY
