@@ -60,9 +60,10 @@ Add a row to `THIRD_PARTY.md` when adding either kind.
 
 ## CI
 
-`ci.yml` on every push: shellcheck at warning, `nix flake check`, a build of every
-package and of the example system, and a push of what was built to the `ikigai-desktop`
-Cachix cache. Pushing needs the `CACHIX_AUTH_TOKEN` secret; without it the build runs
+`ci.yml` on every push: shellcheck at warning, then four jobs in a chain, each with its
+own log and each pushing to the `ikigai-desktop` Cachix cache before the next starts:
+`nix flake check --no-build`, the compositor fork, every Ikigai package, the example
+system. Pushing needs the `CACHIX_AUTH_TOKEN` secret; without it the build runs
 and nothing is pushed. `iso.yml` builds the ISO and the kexec image (`ikigai-kexec.tar.gz`, what
 `ikigai-migrate` fetches) and uploads both to the rolling `iso` GitHub release when the
 installer's inputs change on main, or by hand from the Actions tab.
