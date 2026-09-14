@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-# Arch ships Zed's binary as zeditor (zed is ZFS's event daemon). Zed's own installer, the
-# Super+E shortcut, EDITOR and every doc say zed; this makes that name true here too.
-exec zeditor "$@"

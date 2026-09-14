@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Carry a box's state from one Ikigai to another: the Arch install to the NixOS one. Nearly
+# everything lives in $HOME already and rides along with the home directory; this is the rest.
+#   ikigai-migrate export [FILE]   on the old box, as your user (sudo for the Wi-Fi secrets):
+#                                  NetworkManager connections, greeter state, avatars, Docker
+#                                  volumes, and the host facts, into ~/ikigai-migrate.tar.gz
+#   ikigai-migrate import [FILE]   on the new box, once: puts the same things back and prints
+#                                  the host facts as the lines to set in the flake
+# Runs on Arch without Nix: plain bash, tar, jq, nmcli, docker.
+set -euo pipefail
+
+cmd="${1:-}"; file="${2:-$HOME/ikigai-migrate.tar.gz}"
+say() { printf '==> %s\n' "$*"; }
+
+export_state() {
+  local work; work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+  mkdir -p "$work/nm" "$work/greeter" "$work/avatars" "$work/docker"
+
+  say "NetworkManager connections (sudo: the secrets are root-only)"
+  sudo cp -a /etc/NetworkManager/system-connections/. "$work/nm/" 2>/dev/null || true
+  sudo chown -R "$(id -u):$(id -g)" "$work/nm"
+
+  say "greeter state and avatars"
+  cp -a /var/lib/ikigai/greeter/. "$work/greeter/" 2>/dev/null || true
+  sudo cp -a "/var/lib/AccountsService/icons/$USER" "$work/avatars/$USER" 2>/dev/null || true
+  sudo chown -R "$(id -u):$(id -g)" "$work/avatars"
+
+  if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
+    say "Docker volumes (images are not carried: they rebuild or re-pull)"
+    docker volume ls -q > "$work/docker/volumes.txt"
+    while read -r v; do
+      [ -n "$v" ] || continue
+      docker run --rm -v "$v:/from:ro" -v "$work/docker:/to" alpine tar -czf "/to/$v.tar.gz" -C /from . && echo "  $v"
+    done < "$work/docker/volumes.txt"
+  fi
+
+  say "host facts"
+  local gpu tz country
+  gpu=$(cat "${IKIGAI_STATE:-$HOME/.local/state/ikigai}/gpu" 2>/dev/null || echo none)
+  tz=$(readlink -f /etc/localtime 2>/dev/null || true); tz=${tz#/usr/share/zoneinfo/}
+  country=$(sed -n 's/^WIRELESS_REGDOM="\(..\)"/\1/p' /etc/conf.d/wireless-regdom 2>/dev/null || true)
+  jq -n --arg host "$(hostname)" --arg user "$USER" --arg gpu "$gpu" --arg tz "${tz:-UTC}" \
+        --arg country "${country:-}" --arg locale "${LANG:-en_US.UTF-8}" \
+        --arg layout "$(localectl status 2>/dev/null | sed -n 's/.*X11 Layout: //p' | head -1)" \
+        --argjson steam "$(command -v steam >/dev/null && echo true || echo false)" \
+        '{host: $host, user: $user, gpu: $gpu, timeZone: $tz, wifiCountry: $country, locale: $locale, keyboard: $layout, steam: $steam}' \
+        > "$work/facts.json"
+  cat "$work/facts.json"
+
+  tar -czf "$file" -C "$work" .
+  say "wrote $file. Keep it in your home: a NixOS install that mounts this home finds it there."
+}
+
+import_state() {
+  [ -f "$file" ] || { echo "no $file" >&2; exit 1; }
+  local work; work=$(mktemp -d); trap 'rm -rf "$work"' EXIT
+  tar -xzf "$file" -C "$work"
+
+  if [ -n "$(ls -A "$work/nm" 2>/dev/null)" ]; then
+    say "NetworkManager connections"
+    sudo install -d -m700 /etc/NetworkManager/system-connections
+    sudo cp -a "$work/nm/." /etc/NetworkManager/system-connections/
+    sudo chown -R root:root /etc/NetworkManager/system-connections
+    sudo chmod 600 /etc/NetworkManager/system-connections/*
+    sudo nmcli connection reload && nmcli -g NAME connection show | sed 's/^/  /'
+  fi
+  if [ -n "$(ls -A "$work/greeter" 2>/dev/null)" ]; then
+    say "greeter state"; cp -a "$work/greeter/." /var/lib/ikigai/greeter/ 2>/dev/null || true
+  fi
+  if [ -n "$(ls -A "$work/avatars" 2>/dev/null)" ]; then
+    say "avatars"; sudo install -d /var/lib/AccountsService/icons
+    sudo cp -a "$work/avatars/." /var/lib/AccountsService/icons/
+  fi
+  if [ -s "$work/docker/volumes.txt" ] && command -v docker >/dev/null; then
+    say "Docker volumes"
+    while read -r v; do
+      [ -n "$v" ] && [ -f "$work/docker/$v.tar.gz" ] || continue
+      docker volume create "$v" >/dev/null
+      docker run --rm -v "$v:/to" -v "$work/docker:/from:ro" alpine tar -xzf "/from/$v.tar.gz" -C /to && echo "  $v"
+    done < "$work/docker/volumes.txt"
+  fi
+
+  say "host facts: the lines for your flake (hosts/<name>/default.nix)"
+  jq -r '"  networking.hostName = \"\(.host)\";\n  ikigai.user = \"\(.user)\";\n  ikigai.gpu = \"\(.gpu)\";\n  ikigai.steam.enable = \(.steam);\n  time.timeZone = \"\(.timeZone)\";\n  i18n.defaultLocale = \"\(.locale)\";" + (if .wifiCountry != "" then "\n  ikigai.wifiCountry = \"\(.wifiCountry)\";" else "" end) + (if .keyboard != "" then "\n  console.keyMap = \"\(.keyboard)\";" else "" end)' "$work/facts.json"
+}
+
+case "$cmd" in
+  export) export_state ;;
+  import) import_state ;;
+  *) sed -n '2,10p' "$0" >&2; exit 2 ;;
+esac

@@ -23,8 +23,7 @@ Fixed on the fork, 2026-09-13: Smithay `dc10f06c` returns early from the `wlr_la
 `session_lock` pre-commit hooks once the role object is dead, the check Drakulix named as
 acceptable in smithay#1979; cosmic-comp `fee768c8` pins it. `just comp-test` is the proof:
 stock Qt survives six hide/show cycles and two lock cycles under the fork and dies on the
-first of each under stock. Not sent upstream yet. The Qt rebuild is gone with it;
-`install/packages.sh` restores stock qt6-base on a box that still has it.
+first of each under stock. Not sent upstream yet. The Qt rebuild is gone with it; Qt is nixpkgs' stock package.
 
 ### `set_focus` ignores exclusive layer surfaces for one frame
 

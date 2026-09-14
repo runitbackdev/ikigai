@@ -1,9 +1,0 @@
-[Unit]
-Description=Ikigai settings daemon (cosmic-settings-daemon)
-PartOf=ikigai-session.target
-After=graphical-session-pre.target
-
-[Service]
-ExecStart=/usr/bin/cosmic-settings-daemon
-Restart=on-failure
-RestartSec=1

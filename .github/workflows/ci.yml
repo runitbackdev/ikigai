@@ -1,3 +1,8 @@
+# Every push: the flake evaluates, every Ikigai package and the example system build, and
+# what was built goes to the ikigai-desktop binary cache so an install downloads the
+# compositor fork, the session and the shell plugins instead of compiling them. Pushing
+# needs the CACHIX_AUTH_TOKEN secret (app.cachix.org, cache ikigai-desktop); without it the
+# build still runs and nothing is pushed.
 name: ci
 on:
   push:
@@ -17,11 +22,23 @@ jobs:
           severity: warning
           scandir: .
           ignore_paths: config themes tools
-          additional_files: ikigai-keys ikigai-theme-set
+          additional_files: ikigai-keys ikigai-install
 
-  arch:
+  nix:
     runs-on: ubuntu-latest
-    container: archlinux:latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - run: bash scripts/ci-check.sh
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/cachix-action@v16
+        with:
+          name: ikigai-desktop
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: ${{ secrets.CACHIX_AUTH_TOKEN == '' }}
+      - name: Check
+        run: nix flake check --accept-flake-config -L
+      - name: Build
+        run: |
+          nix build --accept-flake-config -L --no-link \
+            .#cosmic-comp .#ikigai-session .#ikigai-shell-plugins .#ikigai-shell .#ikigai-theme \
+            .#ikigai-icons .#ikigai-cosmic-config .#ikigai-commands .#phosphor-font .#zen \
+            .#nixosConfigurations.example.config.system.build.toplevel

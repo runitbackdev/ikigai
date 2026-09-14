@@ -1,5 +1,16 @@
 # Ikigai v2 plan
 
+## NixOS, 2026-09-14
+
+Ikigai moves from Arch to NixOS; the Arch path (`boot.sh`, `archinstall.json`, `install/`,
+the pacman repo) is retired. The desktop is a NixOS module (`nix/ikigai`), every app config
+is a full Home Manager module (`nix/home`), the compositor fork is an overlay over nixpkgs'
+cosmic-comp built into the `ikigai-desktop` Cachix cache. A box is a separate personal
+flake (`templates/personal`) that `ikigai-install` writes to `/etc/nixos`; `ikigai-migrate`
+carries the rest of an Arch box over. Left to verify on hardware: the ISO and `boot.ps1`
+boot, the installer's two modes, the greeter and session under the fork, NVIDIA's 580
+pin, `nix run .#vm`, and the cache once its key is pasted in. Everything below is history.
+
 Decided 2026-09-02. Ikigai keeps cosmic-comp (window chrome, floating-first with a tiling
 toggle) and the COSMIC portal, and replaces the rest of the COSMIC session with its own
 launcher and a Quickshell shell. Nothing ships until the swap (step G); until then "Ikigai"

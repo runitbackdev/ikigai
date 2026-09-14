@@ -1,51 +1,55 @@
 #!/usr/bin/env bash
-# Update the box: Arch and AUR packages, then Ikigai itself — pull the checkout and rerun
-# the installer steps that changed since the installed commit (just update). Restarts the
-# shell when something was reinstalled; session and greeter changes want a log out.
-#   ikigai-update              packages + Ikigai
-#   ikigai-update --no-pkg     Ikigai only
-#   ikigai-update --pkg        packages only
+# Update the box: pull the personal flake if it is a clean git checkout, move every input
+# (Ikigai, nixpkgs) to its latest, rebuild and switch. The old generation stays in the boot
+# menu. Restarts the shell when the system changed; session and greeter changes want a
+# log out.
+#   ikigai-update              inputs + rebuild
+#   ikigai-update --no-pull    rebuild from the inputs as locked
+#   ikigai-update --check      show what would change, switch nothing
 set -euo pipefail
 
-IKIGAI_PATH="${IKIGAI_PATH:-$HOME/.local/share/ikigai}"
-IKIGAI_REF="${IKIGAI_REF:-main}"
-STATE="${IKIGAI_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/ikigai}"
-pkg=1 self=1
+FLAKE="${IKIGAI_FLAKE:-@flake@}"
+pull=1 check=0
 case "${1:-}" in
-  --no-pkg) pkg=0 ;;
-  --pkg) self=0 ;;
+  --no-pull) pull=0 ;;
+  --check) check=1 ;;
   "") ;;
-  *) sed -n '2,7p' "$0" >&2; exit 2 ;;
+  *) sed -n '2,8p' "$0" >&2; exit 2 ;;
 esac
 
-if [ "$pkg" = 1 ]; then
-  echo "==> packages"
-  sudo pacman -Syu
-  command -v paru >/dev/null && paru -Sua
-  # Leftovers pacman won't mention on its own. paccache.timer trims the cache weekly.
-  orphans=$(pacman -Qdtq 2>/dev/null | tr '\n' ' ')
-  [ -n "$orphans" ] && echo "orphaned packages (pacman -Rns \$(pacman -Qdtq) removes them): $orphans"
-  if command -v pacdiff >/dev/null; then
-    pacnew=$(pacdiff -o 2>/dev/null | wc -l)
-    [ "$pacnew" -gt 0 ] && echo "$pacnew .pacnew/.pacsave file(s) in /etc (sudo pacdiff to merge)"
+[ -f "$FLAKE/flake.nix" ] || { echo "no flake at $FLAKE (IKIGAI_FLAKE, or ikigai.flake in the config)" >&2; exit 1; }
+
+if [ "$pull" = 1 ]; then
+  if [ -d "$FLAKE/.git" ]; then
+    if git -C "$FLAKE" diff --quiet HEAD 2>/dev/null && git -C "$FLAKE" rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then
+      echo "==> pulling $FLAKE"
+      git -C "$FLAKE" pull -q --ff-only || echo "pull failed; updating from what's checked out" >&2
+    else
+      echo "checkout is dirty or has no upstream; updating from what's checked out" >&2
+    fi
+  fi
+  echo "==> inputs"
+  nix flake update --flake "$FLAKE"
+fi
+
+before=$(readlink /run/current-system)
+if [ "$check" = 1 ]; then
+  echo "==> building"
+  nixos-rebuild build --flake "$FLAKE"
+  nix store diff-closures /run/current-system ./result | head -60
+  rm -f result
+  exit 0
+fi
+
+echo "==> switching"
+sudo nixos-rebuild switch --flake "$FLAKE"
+after=$(readlink /run/current-system)
+if [ "$before" != "$after" ]; then
+  nix store diff-closures "$before" "$after" | head -40 || true
+  if [ -n "${WAYLAND_DISPLAY:-}" ] && systemctl --user is-active -q ikigai-shell; then
+    echo "==> restarting the shell"
+    systemctl --user daemon-reload
+    systemctl --user restart ikigai-bridge.service ikigai-shell.service
   fi
 fi
-
-[ "$self" = 1 ] || exit 0
-[ -d "$IKIGAI_PATH/.git" ] || { echo "no checkout at $IKIGAI_PATH; run boot.sh" >&2; exit 1; }
-
-echo "==> ikigai"
-if git -C "$IKIGAI_PATH" diff --quiet HEAD && [ "$(git -C "$IKIGAI_PATH" rev-parse --abbrev-ref HEAD)" = "$IKIGAI_REF" ]; then
-  git -C "$IKIGAI_PATH" pull -q --ff-only origin "$IKIGAI_REF" || echo "pull failed; updating from what's checked out" >&2
-else
-  echo "checkout is dirty or not on $IKIGAI_REF; updating from what's checked out" >&2
-fi
-
-before=$(cat "$STATE/installed_commit" 2>/dev/null || true)
-just -f "$IKIGAI_PATH/justfile" update
-after=$(cat "$STATE/installed_commit" 2>/dev/null || true)
-
-if [ "$before" != "$after" ] && [ -n "${WAYLAND_DISPLAY:-}" ] && systemctl --user is-active -q ikigai-shell; then
-  echo "==> restarting the shell"
-  just -f "$IKIGAI_PATH/justfile" restart
-fi
+echo "done; log out for session or greeter changes"

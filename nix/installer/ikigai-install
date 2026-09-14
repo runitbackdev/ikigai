@@ -1,0 +1,172 @@
+# The Ikigai installer, run by the ISO on tty1 (nix/iso.nix). Asks for the disk, a user,
+# a password, a hostname and a timezone, writes a personal flake (templates/personal) to
+# /etc/nixos of the new system and runs nixos-install from it. From boot.ps1 the mode and
+# the disk come from the kernel command line; from a stick it asks.
+#   ikigai.mode=replace   wipe the disk: an ESP and a root
+#   ikigai.mode=dual      keep Windows: /boot and a root in the largest free region,
+#                         Windows' own ESP mounted at /efi for the loader
+#   ikigai.ref=<branch>   which Ikigai to install (main)
+
+say() { printf '\e[36m==> %s\e[0m\n' "$*"; }
+die() { printf '\e[31mikigai-install: %s\e[0m\n' "$*" >&2; exit 1; }
+param() { sed -n "s/.*[[:space:]]$1=\([^[:space:]]*\).*/\1/p" /proc/cmdline; }
+ask() { # ask VAR "prompt" "default"
+  local v; read -r -p "$2${3:+ [$3]}: " v; printf -v "$1" '%s' "${v:-$3}";
+}
+
+choice="" disk="" hostname="" username="" timezone="" keymap="" gitname="" gitemail=""
+[ "$(id -u)" = 0 ] || die "run as root"
+[ -d /sys/firmware/efi ] || die "this machine booted in legacy BIOS mode; Ikigai needs UEFI"
+mode="$(param ikigai.mode)"
+ref="$(param ikigai.ref)"; ref="${ref:-main}"
+template=/etc/ikigai/templates/personal
+
+echo
+echo "  ikigai install"
+echo
+
+until curl -fsS -m 10 -o /dev/null https://github.com; do
+  say "No internet. Wi-Fi: nmcli device wifi connect <network> --ask. Then press Enter."
+  read -r _
+done
+
+# ---- the disk ------------------------------------------------------------------------
+if [ -z "$mode" ]; then
+  echo "  1) replace: wipe a disk"
+  echo "  2) dual:    keep Windows, install into free space next to it"
+  ask choice "Install mode" 1
+  case "$choice" in 2|dual) mode=dual ;; *) mode=replace ;; esac
+fi
+stage=""
+if stage="$(readlink -f /dev/disk/by-label/IKIGAI 2>/dev/null)" && [ -b "$stage" ] && [ "$(lsblk -no TYPE "$stage")" = part ]; then
+  disk="/dev/$(lsblk -no pkname "$stage")"
+  say "Booted from the staging partition $stage; the disk is $disk"
+else
+  stage=""
+  lsblk -dno NAME,SIZE,MODEL,TYPE | awk '$NF == "disk" { printf "  /dev/%-10s %8s  %s\n", $1, $2, $3 }'
+  ask disk "Disk to install to (everything on it goes in replace mode)" ""
+fi
+[ -b "$disk" ] || die "no such disk: $disk"
+if [ "$mode" = replace ]; then
+  read -r -p "Type the disk name again to erase $disk: " confirm
+  [ "$confirm" = "$disk" ] || [ "/dev/$confirm" = "$disk" ] || die "not confirmed"
+fi
+
+# ---- who -----------------------------------------------------------------------------
+ask hostname "Hostname" ikigai
+ask username "Username" ""
+[[ $username =~ ^[a-z_][a-z0-9_-]*$ ]] || die "username must be lowercase letters, digits, - and _"
+while :; do
+  read -r -s -p "Password: " pw1; echo
+  read -r -s -p "Again: " pw2; echo
+  [ -n "$pw1" ] && [ "$pw1" = "$pw2" ] && break
+  echo "empty or different; again"
+done
+hashed=$(printf '%s' "$pw1" | mkpasswd -s -m yescrypt)
+ask timezone "Timezone" "$(curl -fsS -m 5 https://ipapi.co/timezone 2>/dev/null || echo UTC)"
+[ -e "/etc/zoneinfo/$timezone" ] || [ -e "/usr/share/zoneinfo/$timezone" ] || timedatectl list-timezones | grep -qx "$timezone" || die "unknown timezone $timezone"
+ask keymap "Keyboard layout" us
+ask gitname "Git name (blank to skip)" "$username"
+ask gitemail "Git email (blank to skip)" ""
+
+gpu=none
+for vendor in /sys/class/drm/card[0-9]/device/vendor; do
+  [ -r "$vendor" ] || continue
+  case "$(cat "$vendor")" in
+    0x10de) gpu=nvidia ;;
+    0x1002) [ "$gpu" = nvidia ] || gpu=amd ;;
+    0x8086) [ "$gpu" = none ] && gpu=intel ;;
+  esac
+done
+say "gpu: $gpu  mode: $mode  disk: $disk  host: $hostname  user: $username  tz: $timezone"
+read -r -p "Install? [y/N] " go; [ "$go" = y ] || [ "$go" = Y ] || die "stopped"
+
+# ---- partitions ----------------------------------------------------------------------
+umount -R /mnt 2>/dev/null || true
+if [ "$mode" = replace ]; then
+  say "Partitioning $disk: 1 GiB ESP, root on the rest"
+  sgdisk --zap-all "$disk" >/dev/null
+  sgdisk -n 1:0:+1GiB -t 1:ef00 -c 1:BOOT -n 2:0:0 -t 2:8300 -c 2:nixos "$disk" >/dev/null
+  udevadm settle
+  boot_part="$(lsblk -pnro NAME "$disk" | sed -n 2p)"; root_part="$(lsblk -pnro NAME "$disk" | sed -n 3p)"
+  mkfs.vfat -F32 -n BOOT "$boot_part" >/dev/null
+  mkfs.ext4 -qF -L nixos "$root_part"
+  mount "$root_part" /mnt
+  mount --mkdir -o umask=077 "$boot_part" /mnt/boot
+  efi_mount=/boot
+else
+  # Keep Windows: drop the staging partition, then a 1 GiB /boot (XBOOTLDR, the kernels)
+  # and the root in the largest free region. Windows' own ESP becomes /efi for the loader.
+  if [ -n "$stage" ]; then
+    say "Removing the staging partition $stage (the installer is in RAM)"
+    sgdisk -d "$(cat "/sys/class/block/$(basename "$stage")/partition")" "$disk" >/dev/null
+    udevadm settle
+  fi
+  read -r start end < <(sfdisk -F "$disk" | awk '$1 ~ /^[0-9]+$/ && $3 > best { best = $3; s = $1; e = $2 } END { print s, e }')
+  [ -n "$start" ] || die "no free space on $disk"
+  n=$(sgdisk -p "$disk" | awk '$1 ~ /^[0-9]+$/ { n = $1 } END { print n + 1 }')
+  say "Partitioning the free region: 1 GiB /boot, root on the rest"
+  sgdisk -n "$n:$start:+1GiB" -t "$n:ea00" -c "$n:BOOT" -n "$((n + 1)):0:$end" -t "$((n + 1)):8300" -c "$((n + 1)):nixos" "$disk" >/dev/null
+  udevadm settle
+  boot_part="$(lsblk -pnro NAME,PARTLABEL "$disk" | awk '$2 == "BOOT" { print $1 }' | tail -1)"
+  root_part="$(lsblk -pnro NAME,PARTLABEL "$disk" | awk '$2 == "nixos" { print $1 }' | tail -1)"
+  esp="$(lsblk -pnro NAME,PARTTYPE "$disk" | awk '$2 == "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" { print $1 }' | head -1)"
+  [ -b "$esp" ] || die "no EFI system partition on $disk to share with Windows"
+  mkfs.vfat -F32 -n BOOT "$boot_part" >/dev/null
+  mkfs.ext4 -qF -L nixos "$root_part"
+  mount "$root_part" /mnt
+  mount --mkdir -o umask=077 "$boot_part" /mnt/boot
+  mount --mkdir -o umask=077 "$esp" /mnt/efi
+  efi_mount=/efi
+fi
+
+# ---- the flake -----------------------------------------------------------------------
+say "Writing the flake to /mnt/etc/nixos"
+cfg=/mnt/etc/nixos
+mkdir -p "$cfg"
+cp -r "$template/." "$cfg/"
+chmod -R u+w "$cfg"
+if [ "$hostname" != ikigai ]; then mv "$cfg/hosts/ikigai" "$cfg/hosts/$hostname"; fi
+if [ "$username" != lycanthropy ]; then mv "$cfg/users/lycanthropy.nix" "$cfg/users/$username.nix"; fi
+sed -i \
+  -e "s|github:runitbackdev/ikigai\"|github:runitbackdev/ikigai/$ref\"|" \
+  -e "s|nixosConfigurations.ikigai|nixosConfigurations.$hostname|" \
+  -e "s|./hosts/ikigai|./hosts/$hostname|" \
+  -e "s|./users/lycanthropy.nix|./users/$username.nix|" \
+  "$cfg/flake.nix"
+sed -i \
+  -e "s|user = \"lycanthropy\";|user = \"$username\";|" \
+  -e "s|gpu = \"nvidia\";|gpu = \"$gpu\";|" \
+  -e "s|networking.hostName = \"ikigai\";|networking.hostName = \"$hostname\";|" \
+  -e "s|time.timeZone = \"UTC\";|time.timeZone = \"$timezone\";|" \
+  -e "s|console.keyMap = \"us\";|console.keyMap = \"$keymap\";|" \
+  "$cfg/hosts/$hostname/default.nix"
+if [ "$mode" = dual ]; then
+  sed -i "s|boot.loader.efi.canTouchEfiVariables = true;|boot.loader.efi.canTouchEfiVariables = true;\n  boot.loader.efi.efiSysMountPoint = \"/efi\";\n  boot.loader.systemd-boot.xbootldrMountPoint = \"/boot\";|" "$cfg/hosts/$hostname/default.nix"
+fi
+sed -i \
+  -e "s|users.users.lycanthropy|users.users.$username|" \
+  -e "s|home-manager.users.lycanthropy|home-manager.users.$username|" \
+  -e "s|description = \"lycanthropy\";|description = \"$username\";|" \
+  -e "s|initialPassword = \"ikigai\";|hashedPassword = \"$hashed\";|" \
+  -e "s|userName = \"lycanthropy\";|userName = \"$gitname\";|" \
+  -e "s|userEmail = \"you@example.com\";|userEmail = \"$gitemail\";|" \
+  "$cfg/users/$username.nix"
+{
+  echo "# Written by nixos-generate-config at install: the disks, the kernel modules the hardware"
+  echo "# needs, the CPU's microcode. Regenerate with nixos-generate-config --show-hardware-config."
+  nixos-generate-config --root /mnt --show-hardware-config
+} > "$cfg/hosts/$hostname/hardware.nix"
+git -C "$cfg" init -q && git -C "$cfg" add -A && git -C "$cfg" -c user.name=ikigai-install -c user.email=install@ikigai commit -qm "ikigai-install: $hostname" 2>/dev/null || true
+
+# ---- install -------------------------------------------------------------------------
+say "nixos-install: the compositor, the shell and the dev stack from the cache, then the boot loader on $efi_mount"
+nixos-install --root /mnt --flake "$cfg#$hostname" --no-root-passwd --no-channel-copy
+uid=$(grep "^$username:" /mnt/etc/passwd | cut -d: -f3 || echo 1000)
+chown -R "${uid:-1000}:users" "$cfg"
+
+# The one-shot entry boot.ps1 registered points at a partition that no longer exists.
+efibootmgr 2>/dev/null | sed -n 's/^Boot\([0-9A-F]*\)\* Ikigai installer.*/\1/p' | xargs -rI{} efibootmgr -q -b {} -B || true
+
+lsblk -o name,size,fstype,label,mountpoints "$disk"
+say "Done. Your flake is /etc/nixos on the new system; ikigai-update rebuilds from it. 'reboot' when ready."

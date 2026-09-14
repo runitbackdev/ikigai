@@ -8,7 +8,7 @@ cfg() {
   local f="$C/$1" d
   [ -f "$HOME/.config/cosmic/$f" ] && { echo "$HOME/.config/cosmic/$f"; return; }
   local IFS=:
-  for d in ${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
+  for d in ${XDG_DATA_DIRS:-/run/current-system/sw/share}; do
     [ -f "${d%/}/cosmic/$f" ] && { echo "${d%/}/cosmic/$f"; return; }
   done
   echo /dev/null
