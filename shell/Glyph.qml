@@ -26,11 +26,17 @@ Item {
         font.pixelSize: glyph.size
     }
 
-    IconImage {
+    // Only for brand marks: an IconImage with no source still runs a theme lookup for the
+    // empty name on creation, a miss that walks every icon directory (tens of ms without
+    // an icon-theme.cache), and would do so for every font glyph.
+    Loader {
         anchors.fill: parent
-        visible: glyph.brand
-        source: glyph.brand ? Qt.resolvedUrl("icons/brand/" + glyph.name.slice(6) + (glyph.fill ? "-fill" : "") + ".svg") : ""
-        sourceSize: Qt.size(glyph.size * 2, glyph.size * 2)
-        color: glyph.color
+        active: glyph.brand
+
+        sourceComponent: IconImage {
+            source: Qt.resolvedUrl("icons/brand/" + glyph.name.slice(6) + (glyph.fill ? "-fill" : "") + ".svg")
+            sourceSize: Qt.size(glyph.size * 2, glyph.size * 2)
+            color: glyph.color
+        }
     }
 }
