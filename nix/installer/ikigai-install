@@ -227,6 +227,16 @@ if [ "$mode" = migrate ]; then
   [ -n "$country" ] && sed -i "s|    steam.enable = |    wifiCountry = \"$country\";\n    steam.enable = |" "$cfg/hosts/$hostname/default.nix"
   # The same uid as on Arch, so the home directory stays theirs.
   sed -i "s|    description = \"$username\";|    description = \"$username\";\n    uid = $uid;|" "$cfg/users/$username.nix"
+  # What pacman had installed on request: a checklist, since each is a line in nixpkgs now
+  # (search.nixos.org) or already in $HOME (npm, cargo, pipx, uv, ~/.local/bin survive).
+  {
+    echo "# Packages pacman had installed on request on the Arch box, $(date -I)."
+    echo "# Ikigai itself covers most; anything else is a line in users/$username.nix:"
+    echo "#   home.packages = with pkgs; [ codex ];"
+    echo "# Tools installed into your home (npm -g, cargo, pipx, uv, ~/.local/bin) are still there."
+    jq -r '.packages[]' <<<"$facts"
+  } > "$cfg/arch-packages.txt"
+  sed -i "s|        # localsend|        # localsend\n        # arch-packages.txt lists what pacman had; codex, for one, is in nixpkgs|" "$cfg/users/$username.nix"
 fi
 sed -i \
   -e "s|users.users.lycanthropy|users.users.$username|" \

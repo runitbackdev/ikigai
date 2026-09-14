@@ -59,16 +59,20 @@ for vendor in /sys/class/drm/card[0-9]/device/vendor; do
   esac
 done
 steam=false; pacman -Q steam >/dev/null 2>&1 && steam=true
+# What pacman installed on request, for the checklist the installer leaves next to the
+# flake: each is a line in nixpkgs or a leftover in $HOME, never carried over as files.
+packages=$(pacman -Qqe 2>/dev/null | jq -R . | jq -sc .)
 
 facts=$(jq -n --arg host "$(hostname)" --arg user "$user" --argjson uid "$uid" --arg hash "$hash" \
   --arg tz "${tz:-UTC}" --arg keymap "${keymap:-us}" --arg locale "${locale:-en_US.UTF-8}" --arg country "$country" \
   --arg gpu "$gpu" --argjson steam "$steam" --arg gitname "${gitname:-$user}" --arg gitemail "$gitemail" \
-  --arg root "$root_uuid" --arg boot "$boot_uuid" --arg efi "$efi_uuid" \
+  --arg root "$root_uuid" --arg boot "$boot_uuid" --arg efi "$efi_uuid" --argjson packages "${packages:-[]}" \
   '{host: $host, user: $user, uid: $uid, hashedPassword: $hash, timeZone: $tz, keyMap: $keymap, locale: $locale,
     wifiCountry: $country, gpu: $gpu, steam: $steam, gitName: $gitname, gitEmail: $gitemail,
-    root: $root, boot: $boot, efi: $efi}')
+    root: $root, boot: $boot, efi: $efi, packages: $packages}')
 say "this box"
-jq 'del(.hashedPassword)' <<<"$facts" | sed 's/^/  /'
+jq 'del(.hashedPassword, .packages)' <<<"$facts" | sed 's/^/  /'
+echo "  $(jq '.packages | length' <<<"$facts") packages pacman installed on request; their names go to /etc/nixos/arch-packages.txt"
 echo
 echo "  Ikigai on NixOS replaces Arch inside the root filesystem. Kept: /home, /root, Docker,"
 echo "  Bluetooth, NetworkManager, /var/lib/ikigai, avatars, ssh host keys, /opt, /srv. Everything"
