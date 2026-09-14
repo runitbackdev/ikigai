@@ -1,11 +1,16 @@
 import Quickshell
 import Quickshell.Services.Notifications
 import QtQuick
+import QtQuick.Effects
 
 // One row of the toast sheet: icon, app, summary, body, image, actions. Clicking invokes
 // the app's default action or dismisses; middle-click always dismisses. The timer pauses
 // under the pointer and never runs for critical urgency. Leaves by fading, then tells the
 // server, so the app hears expired or dismissed only once the row is gone.
+//
+// The image hint is a portrait or a picture: a chat app sends the sender's avatar, a
+// screenshot tool sends the capture. A wide one is a banner under the text; anything
+// squarer takes the icon slot, with the app icon as a badge in its corner.
 Item {
     id: toast
 
@@ -15,6 +20,11 @@ Item {
     readonly property bool critical: n.urgency === NotificationUrgency.Critical
     readonly property int pad: Math.round(14 * Config.scale)
     readonly property int iconSize: Math.round(32 * Config.scale)
+    readonly property int portraitSize: Math.round(48 * Config.scale)
+    readonly property bool pictured: n.image !== "" && picture.status === Image.Ready
+    readonly property bool banner: pictured && picture.implicitWidth >= picture.implicitHeight * 1.5
+    readonly property bool portrait: pictured && !banner
+    readonly property int slotSize: portrait ? portraitSize : iconSize
     readonly property var defaultAction: {
         for (let i = 0; i < n.actions.length; i++)
             if (n.actions[i].identifier === "default")
@@ -91,13 +101,45 @@ Item {
             width: parent.width
             spacing: Math.round(10 * Config.scale)
 
-            AppIcon {
-                source: Notifs.icon(toast.n)
-                size: toast.iconSize
+            Item {
+                width: toast.slotSize
+                height: toast.slotSize
+
+                AppIcon {
+                    source: Notifs.icon(toast.n)
+                    size: toast.iconSize
+                    visible: !toast.portrait
+                }
+
+                Rectangle {
+                    id: mask
+                    anchors.fill: parent
+                    radius: Theme.radius
+                    visible: false
+                    layer.enabled: true
+                }
+
+                MultiEffect {
+                    anchors.fill: parent
+                    source: picture
+                    maskEnabled: true
+                    maskSource: mask
+                    visible: toast.portrait
+                }
+
+                // Whose avatar this is: the app, in the corner.
+                AppIcon {
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.margins: -2
+                    source: Notifs.icon(toast.n)
+                    size: Math.round(18 * Config.scale)
+                    visible: toast.portrait
+                }
             }
 
             Column {
-                width: parent.width - toast.iconSize - parent.spacing
+                width: parent.width - toast.slotSize - parent.spacing
                 spacing: 2
 
                 Text {
@@ -137,11 +179,15 @@ Item {
             }
         }
 
+        // Loaded once, shown as banner or portrait by shape. Hidden and square when a
+        // portrait, so the Column skips it and the icon slot's MultiEffect draws it there.
         Image {
-            width: parent.width
-            height: Math.round(120 * Config.scale)
+            id: picture
+            width: toast.banner ? parent.width : toast.portraitSize
+            height: toast.banner ? Math.round(120 * Config.scale) : toast.portraitSize
             source: toast.n.image
-            visible: toast.n.image !== ""
+            visible: toast.banner
+            sourceSize: Qt.size(512, 512)
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
         }
