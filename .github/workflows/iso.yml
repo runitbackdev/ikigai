@@ -1,0 +1,51 @@
+# The installer ISO and the kexec image, published to the rolling `iso` GitHub release:
+# boot.ps1 and a USB stick fetch the ISO, ikigai-migrate on an Arch box the kexec image.
+# Runs by hand, or when the installer's inputs change on main.
+name: iso
+on:
+  push:
+    branches: [main]
+    paths:
+      - nix/iso.nix
+      - nix/kexec.nix
+      - nix/installer/**
+      - templates/**
+      - flake.lock
+      - .github/workflows/iso.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# One ISO build at a time; a newer trigger replaces an older one still running.
+concurrency:
+  group: iso
+  cancel-in-progress: true
+
+jobs:
+  iso:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/cachix-action@v16
+        with:
+          name: ikigai-desktop
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: true
+      - name: Build
+        run: |
+          nix build --accept-flake-config -L .#iso
+          mkdir -p out && cp result/iso/ikigai-x86_64.iso out/
+          nix build --accept-flake-config -L .#kexec -o result-kexec
+          tar -chzf out/ikigai-kexec.tar.gz -C result-kexec bzImage initrd.gz kexec-boot
+          (cd out && sha256sum ikigai-x86_64.iso > ikigai-x86_64.iso.sha256 && sha256sum ikigai-kexec.tar.gz > ikigai-kexec.tar.gz.sha256)
+          ls -la out
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view iso >/dev/null 2>&1 || gh release create iso --title "Ikigai installer" \
+            --notes "The installer, rebuilt by CI: the ISO for a USB stick or boot.ps1, the kexec image for ikigai-migrate."
+          gh release upload iso --clobber out/ikigai-x86_64.iso out/ikigai-x86_64.iso.sha256 out/ikigai-kexec.tar.gz out/ikigai-kexec.tar.gz.sha256

@@ -1,9 +1,0 @@
-[Unit]
-Description=Ikigai wallpaper (cosmic-bg)
-PartOf=ikigai-session.target
-After=graphical-session-pre.target
-
-[Service]
-ExecStart=/usr/bin/cosmic-bg
-Restart=on-failure
-RestartSec=1

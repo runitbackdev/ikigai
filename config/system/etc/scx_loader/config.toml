@@ -1,9 +1,0 @@
-# The CPU scheduler is sched_ext's LAVD (scx_lavd, /etc/scx_loader/config.toml; scx_loader
-# starts it at boot). The kernel's EEVDF shares the CPU fairly per thread, so a 12-thread
-# build starves a game that has to wake and sleep between frames: LAVD, written for the Steam
-# Deck, spots latency-critical tasks by exactly that wake/sleep pattern and lets them preempt
-# the hogs, at nearly no cost to the build. Auto mode picks a power profile from the load.
-#   scxctl switch --sched scx_bpfland     another scheduler, live
-#   scxctl stop                           back to EEVDF, live
-default_sched = "scx_lavd"
-default_mode = "Auto"

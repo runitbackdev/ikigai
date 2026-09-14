@@ -1,3 +1,9 @@
+# Every push: the flake evaluates, the compositor fork builds, then every Ikigai package,
+# then the example system, each stage a job of its own so a failure is one short log and
+# each stage's output goes to the ikigai-desktop binary cache before the next starts. An
+# install then downloads the fork, the session crate and the shell plugins instead of
+# compiling them. Pushing needs the CACHIX_AUTH_TOKEN secret (app.cachix.org, cache
+# ikigai-desktop); without it the build still runs and nothing is pushed.
 name: ci
 on:
   push:
@@ -6,6 +12,12 @@ on:
 
 permissions:
   contents: read
+
+# A new push to a pull request cancels the run before it; main always runs to the end, so
+# what lands there is built and cached whatever comes after.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   shellcheck:
@@ -17,11 +29,63 @@ jobs:
           severity: warning
           scandir: .
           ignore_paths: config themes tools
-          additional_files: ikigai-keys ikigai-theme-set
+          additional_files: ikigai-keys ikigai-install
 
-  arch:
+  check:
     runs-on: ubuntu-latest
-    container: archlinux:latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - run: bash scripts/ci-check.sh
+      - uses: DeterminateSystems/nix-installer-action@main
+      - name: Evaluate
+        run: nix flake check --accept-flake-config --no-build -L
+
+  fork:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Free disk
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost && df -h /
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/cachix-action@v16
+        with:
+          name: ikigai-desktop
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: ${{ secrets.CACHIX_AUTH_TOKEN == '' }}
+      - name: cosmic-comp
+        run: nix build --accept-flake-config -L --no-link .#cosmic-comp
+
+  packages:
+    needs: fork
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Free disk
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost && df -h /
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/cachix-action@v16
+        with:
+          name: ikigai-desktop
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: ${{ secrets.CACHIX_AUTH_TOKEN == '' }}
+      - name: Packages
+        run: |
+          nix build --accept-flake-config -L --no-link \
+            .#ikigai-session .#ikigai-shell-plugins .#ikigai-shell .#ikigai-theme .#ikigai-icons \
+            .#ikigai-cosmic-config .#ikigai-commands .#ikigai-install .#phosphor-font .#zen
+
+  system:
+    needs: packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Free disk
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost && df -h /
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/cachix-action@v16
+        with:
+          name: ikigai-desktop
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: ${{ secrets.CACHIX_AUTH_TOKEN == '' }}
+      - name: Example system
+        run: nix build --accept-flake-config -L --no-link .#nixosConfigurations.example.config.system.build.toplevel

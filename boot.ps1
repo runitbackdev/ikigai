@@ -2,9 +2,10 @@
 #
 #   irm https://raw.githubusercontent.com/runitbackdev/ikigai/main/boot.ps1 | iex
 #
-# Stages the Arch ISO on a small new partition of this disk and reboots into it once.
-# The ISO then runs windows/live.sh, which runs archinstall (Windows is erased there,
-# not here) and Ikigai's own installer. Everything this script does is undone by -Undo.
+# Stages the Ikigai installer ISO (NixOS-based) on a small new partition of this disk
+# and reboots into it once. The installer there asks for the disk to confirm (Windows
+# is erased there, not here), a user, a hostname and a timezone, then installs Ikigai.
+# Everything this script does is undone by -Undo.
 #
 #   & ([scriptblock]::Create((irm <url>))) -Mode dual -GB 200
 [CmdletBinding()]
@@ -21,10 +22,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $Label = 'IKIGAI'
-$StageGB = 2
+$StageGB = 3
 $Description = 'Ikigai installer'
-$Mirror = 'https://geo.mirror.pkgbuild.com/iso/latest'
-if (-not $Raw) { $Raw = "https://raw.githubusercontent.com/runitbackdev/ikigai/$Ref" }
+$Release = 'https://github.com/runitbackdev/ikigai/releases/download/iso'
 
 function Step($text) { Write-Host "==> $text" -ForegroundColor Cyan }
 function Note($text) { Write-Host "    $text" -ForegroundColor DarkGray }
@@ -64,9 +64,9 @@ function Test-Preflight($target) {
   Note 'UEFI firmware'
 
   if (Confirm-SecureBootUEFI) {
-    throw "Secure Boot is on. The Arch ISO is unsigned and will not boot.`n" +
+    throw "Secure Boot is on. The ISO's GRUB is unsigned and will not boot.`n" +
       "    Turn it off in your firmware settings (usually Del or F2 at power-on), then run this again.`n" +
-      "    It stays off: Arch does not sign its kernels."
+      "    It stays off: Ikigai does not sign its kernels."
   }
   Note 'Secure Boot off'
 
@@ -100,7 +100,8 @@ function Get-Stage($target) {
 
 # Shrink C: and put a small FAT32 partition in the gap. In dual mode the gap is bigger
 # than the partition: the rest stays free for the root filesystem. A rerun finds the
-# partition from the last time and reuses it.
+# partition from the last time and reuses it. The label matters: GRUB and the kernel
+# on the ISO both find this partition by it.
 function New-Stage($target) {
   $stage = Get-Stage $target
   if ($stage) { Note "reusing the $Label partition ($($stage.DriveLetter):)"; return $stage }
@@ -123,29 +124,30 @@ function New-Stage($target) {
   $stage
 }
 
-# The ISO from a mirror, its checksum from archlinux.org: two hosts have to agree.
+# The ISO and its checksum from the 'iso' release on GitHub. The checksum file is
+# fetched fresh every time; the ISO only when it is missing or does not match.
 function Get-Iso($stage) {
-  $iso = "$($stage.DriveLetter):\archlinux-x86_64.iso"
-  $version = (Invoke-RestMethod "$Mirror/arch/version").Trim()
-  $sums = Invoke-RestMethod "https://archlinux.org/iso/$version/sha256sums.txt"
-  $want = ($sums -split "`n" | Where-Object { $_ -match '\sarchlinux-x86_64\.iso$' }) -replace '\s.*'
-  if (-not $want) { throw "no sha256 for archlinux-x86_64.iso $version on archlinux.org" }
+  $iso = "$($stage.DriveLetter):\ikigai-x86_64.iso"
+  Invoke-WebRequest -UseBasicParsing "$Release/ikigai-x86_64.iso.sha256" -OutFile "$iso.sha256"
+  $want = (Get-Content "$iso.sha256" | Where-Object { $_ -match '\sikigai-x86_64\.iso$' }) -replace '\s.*'
+  if (-not $want) { throw 'no sha256 for ikigai-x86_64.iso in the release' }
 
   if (-not (Test-Path $iso) -or (Get-FileHash $iso -Algorithm SHA256).Hash -ne $want) {
-    Step "Downloading Arch Linux $version"
+    Step 'Downloading the Ikigai ISO'
     # Start-Process: curl's progress bar is stderr, which PowerShell 5.1 would treat as an error.
     $curl = Start-Process curl.exe -NoNewWindow -Wait -PassThru -ArgumentList @(
       '--location', '--fail', '--retry', '5', '--continue-at', '-', '--progress-bar',
-      '--output', $iso, "$Mirror/archlinux-x86_64.iso")
+      '--output', $iso, "$Release/ikigai-x86_64.iso")
     if ($curl.ExitCode -ne 0) { throw "download failed (curl exit $($curl.ExitCode))" }
     if ((Get-FileHash $iso -Algorithm SHA256).Hash -ne $want) { throw 'the downloaded ISO does not match its checksum' }
   }
-  Note "archlinux-x86_64.iso $version verified"
+  Note 'ikigai-x86_64.iso verified'
   $iso
 }
 
-# The ISO's own systemd-boot, kernel and initramfs, at the paths its loader entry
-# expects. The initramfs loop-mounts the ISO next to them and copies it to RAM, so
+# The ISO's own GRUB, kernel, initrd and store image, at the paths its grub.cfg expects.
+# GRUB finds this partition by label and so does the kernel (root=LABEL=IKIGAI), so the
+# config only gets our parameters appended. copytoram pulls the squashfs into RAM, so
 # the disk is free by the time the live system is up.
 function Install-Boot($stage, $iso) {
   Step 'Staging the boot'
@@ -159,18 +161,24 @@ function Install-Boot($stage, $iso) {
       Start-Sleep 1
     }
     if (-not $src) { throw 'the mounted ISO got no drive letter' }
-    New-Item -ItemType Directory -Force "$d\EFI\BOOT", "$d\arch\boot\x86_64", "$d\loader\entries" | Out-Null
-    Copy-Item "${src}:\EFI\BOOT\BOOTx64.EFI" "$d\EFI\BOOT\"
-    Copy-Item "${src}:\arch\boot\x86_64\vmlinuz-linux", "${src}:\arch\boot\x86_64\initramfs-linux.img" "$d\arch\boot\x86_64\"
+    New-Item -ItemType Directory -Force "$d\EFI\BOOT", "$d\boot" | Out-Null
+    Copy-Item "${src}:\EFI\BOOT\*.EFI", "${src}:\EFI\BOOT\grub.cfg" "$d\EFI\BOOT\" -Force
+    Copy-Item "${src}:\boot\*" "$d\boot\" -Recurse -Force
+    Copy-Item "${src}:\nix-store.squashfs" "$d\" -Force
+    if (Test-Path "${src}:\version.txt") { Copy-Item "${src}:\version.txt" "$d\" -Force }
   }
   finally { Dismount-DiskImage -ImagePath $iso | Out-Null }
 
-  $options = "archisobasedir=arch img_label=$Label img_loop=/archlinux-x86_64.iso copytoram=y " +
-    "script=$Raw/windows/live.sh ikigai.mode=$Mode ikigai.ref=$Ref ikigai.raw=$Raw"
-  [IO.File]::WriteAllText("$d\loader\loader.conf", "timeout 3`ndefault ikigai.conf`n")
-  [IO.File]::WriteAllText("$d\loader\entries\ikigai.conf",
-    "title Ikigai installer`nlinux /arch/boot/x86_64/vmlinuz-linux`ninitrd /arch/boot/x86_64/initramfs-linux.img`noptions $options`n")
-  Note 'systemd-boot, kernel, initramfs and loader entry in place'
+  # Files copied off the ISO keep its read-only bit; drop it before editing.
+  $cfg = "$d\EFI\BOOT\grub.cfg"
+  Set-ItemProperty $cfg -Name IsReadOnly -Value $false
+  $extra = " copytoram ikigai.mode=$Mode ikigai.ref=$Ref"
+  if ($Raw) { $extra += " ikigai.raw=$Raw" }
+  $text = [IO.File]::ReadAllText($cfg)
+  if ($text -notmatch "root=LABEL=$Label") { throw "the ISO's grub.cfg has no root=LABEL=$Label line" }
+  $text = [regex]::Replace($text, "(?m)^[^\r\n]*root=LABEL=$Label[^\r\n]*", { param($m) $m.Value + $extra })
+  [IO.File]::WriteAllText($cfg, $text, (New-Object Text.UTF8Encoding $false))
+  Note 'GRUB, kernel, initrd and store image in place; grub.cfg carries the mode'
 }
 
 # A firmware boot entry cloned from Windows' own, pointed at the staging partition,
@@ -181,7 +189,7 @@ function Add-BootEntry($stage) {
   $id = [regex]::Match("$out", '\{[0-9a-f-]+\}').Value
   if ($LASTEXITCODE -ne 0 -or -not $id) { throw "bcdedit /copy failed: $out" }
   bcdedit /set $id device "partition=$($stage.DriveLetter):" | Out-Null
-  bcdedit /set $id path '\EFI\BOOT\BOOTx64.EFI' | Out-Null
+  bcdedit /set $id path '\EFI\BOOT\BOOTX64.EFI' | Out-Null
   bcdedit /set '{fwbootmgr}' bootsequence $id | Out-Null
   if ($LASTEXITCODE -ne 0) { throw 'bcdedit could not queue the boot entry' }
   Note "boot entry $id, once"
@@ -248,11 +256,11 @@ try {
   Add-BootEntry $stage
 
   Step 'Ready'
-  Write-Host "    On restart this PC boots the Arch installer once. It asks for a user, a password"
-  Write-Host "    and a timezone, confirms the disk, installs Ikigai and reboots into it."
+  Write-Host "    On restart this PC boots the Ikigai installer once. It asks for the disk to confirm,"
+  Write-Host "    then a username, password, hostname and timezone, installs Ikigai and reboots into it."
   Write-Host "    Windows is untouched until you confirm that disk. Changed your mind? Run this with -Undo."
   if ($Mode -eq 'dual') {
-    Write-Host "    Afterwards systemd-boot lists both Ikigai and Windows. The first time you are back in"
+    Write-Host "    Afterwards the boot menu lists both Ikigai and Windows. The first time you are back in"
     Write-Host "    Windows, run this once with -Clean to drop the leftover 'Ikigai installer' boot entry."
   }
   if ($NoReboot) { Note 'not restarting (-NoReboot)'; return }

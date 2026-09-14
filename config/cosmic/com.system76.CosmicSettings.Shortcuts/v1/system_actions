@@ -48,7 +48,7 @@
     /// Raises the volume of the active output device
     VolumeRaise: "wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+",
     /// Opens the system default web browser
-    WebBrowser: "zen-browser",
+    WebBrowser: "zen",
     /// Opens the (alt+tab) window switcher
     WindowSwitcher: "ikigai-shell switcher next",
     /// Opens the (alt+shift+tab) window switcher

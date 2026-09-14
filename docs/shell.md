@@ -1,6 +1,6 @@
 # The shell
 
-Ikigai's shell is Quickshell, run by `ikigai-shell.service` from `/usr/local/share/ikigai/shell`.
+Ikigai's shell is Quickshell, run by `ikigai-shell.service` from `/run/current-system/sw/share/ikigai/shell`.
 A rounded frame around the desktop, a thin rail that autohides into its left border, cards
 that melt out of the rail. One rail per screen.
 
@@ -82,7 +82,7 @@ user; `ikigai-shell welcome open` brings it back.
 
 Per app, the way Windows does it. Zen through `/etc/zen/policies/policies.json`, Discord
 and YouTube Music through `--enable-blink-features=MiddleClickAutoscroll` on their desktop
-entries in `/usr/local/share/applications`. GTK, Qt and COSMIC apps have none.
+entries in `/run/current-system/sw/share/applications`. GTK, Qt and COSMIC apps have none.
 
 ## Settings
 

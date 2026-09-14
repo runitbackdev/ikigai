@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Is this box's Ikigai whole and current? Installed commit vs. the checkout, session units
-# and their sockets, the greeter holding display-manager, the forked compositor, the firewall,
-# and the seeded configs. Prints one line per check; exits 1 if any is "bad".
+# Is this box's Ikigai whole and running? The flake it was built from, the session units and
+# their sockets, the greeter holding the console, the forked compositor, the scheduler, zram
+# and the firewall. The system layer cannot drift on NixOS; what is left to check is what
+# runs. Prints one line per check; exits 1 if any is "bad".
 set -uo pipefail
 
-IKIGAI_PATH="${IKIGAI_PATH:-$HOME/.local/share/ikigai}"
+FLAKE="${IKIGAI_FLAKE:-@flake@}"
 STATE="${IKIGAI_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/ikigai}"
 RUN="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 bad=0
@@ -14,19 +15,17 @@ fail() { printf '  BAD   %-12s %s\n' "$1" "$2"; bad=1; }
 
 echo "ikigai doctor"
 
-# ---- tree and installed commit -------------------------------------------------------
-installed=$(cat "$STATE/installed_commit" 2>/dev/null || echo none)
-head=$(git -C "$IKIGAI_PATH" rev-parse HEAD 2>/dev/null || echo none)
-if [ "$installed" = none ]; then fail install "never installed (no $STATE/installed_commit)"
-elif [ "$installed" = "$head" ]; then ok install "${installed:0:7} = $IKIGAI_PATH HEAD"
-else
-  behind=$(git -C "$IKIGAI_PATH" rev-list --count "$installed..$head" 2>/dev/null || echo '?')
-  steps=$(git -C "$IKIGAI_PATH" diff --name-only "$installed" "$head" -- install 2>/dev/null | sed 's|install/||; s|\.sh$||' | tr '\n' ' ')
-  warn install "${installed:0:7} installed, HEAD ${head:0:7} is $behind ahead${steps:+ (steps changed: $steps)}"
-fi
-if [ -f "$STATE/gpu" ]; then ok gpu "$(cat "$STATE/gpu")"; else warn gpu "no $STATE/gpu (preflight never ran)"; fi
+# ---- the flake and the generation --------------------------------------------------
+if [ -f "$FLAKE/flake.nix" ]; then
+  if [ -d "$FLAKE/.git" ]; then
+    dirty=$(git -C "$FLAKE" status --short 2>/dev/null | wc -l)
+    [ "$dirty" -eq 0 ] && ok flake "$FLAKE clean" || warn flake "$FLAKE has $dirty uncommitted change(s)"
+  else ok flake "$FLAKE (not a git checkout)"; fi
+else warn flake "no flake at $FLAKE (ikigai-update needs one)"; fi
+booted=$(readlink /run/booted-system); current=$(readlink /run/current-system)
+[ "$booted" = "$current" ] && ok system "${current##*/}" || warn system "running ${current##*/}, booted ${booted##*/}: reboot for the kernel and the greeter"
 
-# ---- session ----------------------------------------------------------------------
+# ---- session -----------------------------------------------------------------------
 if [ -z "${WAYLAND_DISPLAY:-}" ]; then
   warn session "not inside a Wayland session; skipping unit checks"
 else
@@ -46,72 +45,51 @@ else
     0) fail shell "no Quickshell instance running shell.qml" ;;
     *) warn shell "$n Quickshell instances running shell.qml (installed and a dev shell?)" ;;
   esac
-  [ -f "$STATE/shell-theme.json" ] && ok theme "$STATE/shell-theme.json" || fail theme "no $STATE/shell-theme.json (ikigai-theme-set never ran)"
+  [ -f "$STATE/shell-theme.json" ] && ok theme "$STATE/shell-theme.json" || fail theme "no $STATE/shell-theme.json (the home module writes it; ikigai-update)"
   [ -f "$HOME/.config/ikigai/shell.json" ] && ok config "$HOME/.config/ikigai/shell.json" || warn config "no $HOME/.config/ikigai/shell.json (shell runs on defaults)"
   [ -f "$RUN/ikigai-session.log" ] && ok log "$RUN/ikigai-session.log ($(wc -l < "$RUN/ikigai-session.log") lines)"
   if busctl --user --no-pager --list 2>/dev/null | grep -q '^org.freedesktop.secrets'; then ok keyring "org.freedesktop.secrets on the session bus"
-  else warn keyring "no org.freedesktop.secrets on the session bus (nothing has asked for it yet, or gnome-keyring is missing)"; fi
-  [ -S "$RUN/gcr/ssh" ] && ok ssh-agent "gcr-ssh-agent at $RUN/gcr/ssh${SSH_AUTH_SOCK:+, SSH_AUTH_SOCK=$SSH_AUTH_SOCK}" || warn ssh-agent "no socket at $RUN/gcr/ssh (gcr-ssh-agent.socket not enabled; re-login after install)"
+  else warn keyring "no org.freedesktop.secrets on the session bus (nothing has asked for it yet, or gnome-keyring is off)"; fi
+  [ -S "$RUN/gcr/ssh" ] && ok ssh-agent "gcr-ssh-agent at $RUN/gcr/ssh${SSH_AUTH_SOCK:+, SSH_AUTH_SOCK=$SSH_AUTH_SOCK}" || warn ssh-agent "no socket at $RUN/gcr/ssh (re-login after the first switch)"
 fi
 
 # ---- system ------------------------------------------------------------------------
-dm=$(basename "$(readlink /etc/systemd/system/display-manager.service 2>/dev/null)" 2>/dev/null)
-[ "$dm" = ikigai-greeter.service ] && ok greeter "display-manager.service -> ikigai-greeter" || fail greeter "display-manager.service -> ${dm:-nothing} (expected ikigai-greeter)"
-for f in /usr/local/bin/ikigai-session /usr/local/bin/ikigai-bridge /usr/local/bin/ikigai-outputs /usr/local/share/ikigai/shell/shell.qml /usr/local/lib/qt6/qml/Ikigai/Blobs /usr/share/wayland-sessions/ikigai.desktop /etc/pam.d/ikigai-greeter; do
+if systemctl cat greetd 2>/dev/null | grep -q ikigai-greeter; then ok greeter "greetd runs ikigai-greeter"; else fail greeter "greetd is not running ikigai-greeter"; fi
+comp=$(readlink -f "$(command -v cosmic-comp 2>/dev/null)" 2>/dev/null)
+case "$comp" in
+  *ikigai*) ok comp "cosmic-comp fork: ${comp#/nix/store/}" ;;
+  "") fail comp "no cosmic-comp on PATH" ;;
+  *) fail comp "stock cosmic-comp (${comp#/nix/store/}); the overlay is not applied" ;;
+esac
+for f in @shell@/shell.qml /run/current-system/sw/share/ikigai/theme/shell.json /run/current-system/sw/share/wayland-sessions/ikigai.desktop; do
   [ -e "$f" ] && ok file "$f" || fail file "missing $f"
 done
-for b in "$IKIGAI_PATH"/bin/*; do
-  n=$(basename "$b")
-  if [ ! -e "/usr/local/bin/$n" ]; then warn bin "/usr/local/bin/$n not installed (just install services)"
-  elif ! cmp -s "$b" "/usr/local/bin/$n"; then warn bin "/usr/local/bin/$n differs from bin/$n (just install services)"
-  fi
-done
-comp=$(pacman -Q cosmic-comp-ikigai 2>/dev/null | cut -d' ' -f2)
-# shellcheck disable=SC1091,SC2154 # epoch, pkgver, pkgrel come from the sourced PKGBUILD
-want=$(. "$IKIGAI_PATH/packages/cosmic-comp/PKGBUILD" 2>/dev/null && echo "$epoch:$pkgver-$pkgrel")
-if [ -z "$comp" ]; then fail comp "stock cosmic-comp $(pacman -Q cosmic-comp 2>/dev/null | cut -d' ' -f2); the fork is not installed (just install packages)"
-elif [ "$comp" = "$want" ]; then ok comp "cosmic-comp-ikigai $comp"
-else warn comp "cosmic-comp-ikigai $comp installed, tree wants $want (ikigai-update --pkg once CI has published it)"; fi
-[ -e /var/lib/ikigai/qt-wayland ] && warn qt "the old Qt Wayland rebuild is still installed (just install packages restores stock)"
-if systemctl -q is-enabled ikigai-firewall 2>/dev/null; then
-  [ -e /var/lib/ikigai/firewall-applied ] && ok firewall "applied" || warn firewall "enabled, applies on next boot"
-else fail firewall "ikigai-firewall not enabled"; fi
-systemctl -q is-enabled paccache.timer 2>/dev/null && ok pacman "paccache.timer enabled" || warn pacman "paccache.timer not enabled (just install services)"
-pacman -Q kernel-modules-hook >/dev/null 2>&1 && ok pacman "kernel-modules-hook installed" || warn pacman "kernel-modules-hook not installed (just install packages)"
-systemctl -q is-enabled systemd-oomd 2>/dev/null && ok oomd "systemd-oomd enabled" || warn oomd "systemd-oomd not enabled (just install services)"
+systemctl -q is-active firewall 2>/dev/null && ok firewall "active" || fail firewall "firewall.service not active"
+systemctl -q is-active systemd-oomd 2>/dev/null && ok oomd "systemd-oomd active" || warn oomd "systemd-oomd not active"
 if systemctl -q is-enabled scx_loader 2>/dev/null; then
   sched=$(cat /sys/kernel/sched_ext/root/ops 2>/dev/null || true)
   [ -n "$sched" ] && ok sched "$sched via scx_loader" || warn sched "scx_loader enabled but sched_ext is off ($(cat /sys/kernel/sched_ext/state 2>/dev/null || echo 'no sched_ext in this kernel')); EEVDF"
-else warn sched "scx_loader not enabled (just install services)"; fi
+else warn sched "scx_loader not enabled; EEVDF"; fi
 if [ -e /sys/block/zram0 ]; then
   zsize=$(swapon --show=SIZE --noheadings --bytes /dev/zram0 2>/dev/null); zused=$(swapon --show=USED --noheadings --bytes /dev/zram0 2>/dev/null)
   ram=$(( $(awk '/^MemTotal/{print $2}' /proc/meminfo) * 1024 ))
-  if [ "${zsize:-0}" -lt "$ram" ]; then warn zram "zram0 $(numfmt --to=iec "${zsize:-0}") < RAM (drop-in not applied; reboot, or restart systemd-zram-setup@zram0 when idle)"
+  if [ "${zsize:-0}" -lt "$ram" ]; then warn zram "zram0 $(numfmt --to=iec "${zsize:-0}") < RAM (reboot for the new size)"
   elif [ $(( zused * 100 / zsize )) -ge 90 ]; then warn zram "zram0 $(numfmt --to=iec "$zused")/$(numfmt --to=iec "$zsize") used: swap full, only file cache left to reclaim"
   else ok zram "zram0 $(numfmt --to=iec "$zsize"), $(numfmt --to=iec "$zused") used"; fi
-else warn zram "no zram0 (zram-generator; comes up at boot)"; fi
-[ "$(systemctl is-enabled NetworkManager-wait-online.service 2>/dev/null)" = masked ] && ok boot "NetworkManager-wait-online masked" || warn boot "NetworkManager-wait-online not masked (just install services)"
+else warn zram "no zram0 (comes up at boot)"; fi
+systemctl -q is-enabled NetworkManager-wait-online 2>/dev/null && warn boot "NetworkManager-wait-online enabled" || ok boot "nothing waits on the network at boot"
 [ "$(getent passwd "$USER" | cut -d: -f7)" = "$(command -v zsh)" ] && ok shell-login zsh || warn shell-login "login shell is not zsh"
-id -nG | tr ' ' '\n' | grep -qx docker && ok docker "in docker group" || warn docker "not in docker group (re-login after install)"
-# 610.x open modules crash Deadlock and other Proton games with Xid 109 CTX SWITCH TIMEOUT (nvidia
-# forums, Arch bbs 313841); the AUR 580xx LTS branch is the pin until a release fixes it.
-if pacman -Q nvidia-580xx-dkms >/dev/null 2>&1; then
-  warn nvidia "pinned to $(pacman -Q nvidia-580xx-dkms | cut -d' ' -f2) (AUR) for Xid 109 in 610.x; when a later nvidia-open-dkms fixes it: paru -S nvidia-open-dkms nvidia-utils lib32-nvidia-utils"
+id -nG | tr ' ' '\n' | grep -qx docker && ok docker "in docker group" || warn docker "not in docker group (re-login after the first switch)"
+if [ -e /proc/driver/nvidia/version ]; then
+  v=$(sed -n 's/.*Kernel Module  *\([0-9.]*\).*/\1/p' /proc/driver/nvidia/version | head -1)
+  case "$v" in
+    580.*) warn nvidia "pinned to $v for Xid 109 in 610.x; ikigai.nvidia.pin580 = false once a later branch is fixed" ;;
+    *) ok nvidia "$v" ;;
+  esac
 fi
-if pacman -Q gamemode >/dev/null 2>&1; then
-  if ! getent group gamemode | grep -qw "$USER"; then warn gamemode "not in the gamemode group (ikigai-steam)"
-  elif ! id -nG | tr ' ' '\n' | grep -qx gamemode; then warn gamemode "in the gamemode group, this login is not: gamemoderun cannot renice until you log out and in"
-  elif [ ! -e "${XDG_CONFIG_HOME:-$HOME/.config}/gamemode.ini" ]; then warn gamemode "no ~/.config/gamemode.ini: gamemoderun does not renice (ikigai-steam seeds one)"
-  else ok gamemode "group in session, renice=$(sed -n 's/^renice=//p' "${XDG_CONFIG_HOME:-$HOME/.config}/gamemode.ini")"; fi
-fi
-
-# ---- seeds -------------------------------------------------------------------------
-if [ -x "$IKIGAI_PATH/scripts/config-diff.sh" ]; then
-  edited=$("$IKIGAI_PATH/scripts/config-diff.sh" | awk '$1=="edited"{n++} END{print n+0}')
-  behind=$("$IKIGAI_PATH/scripts/config-diff.sh" | awk '$1=="behind"{n++} END{print n+0}')
-  [ "$edited" -gt 0 ] && warn seeds "$edited seeded config(s) edited by hand (scripts/config-diff.sh --diff)"
-  [ "$behind" -gt 0 ] && warn seeds "$behind seeded config(s) behind the repo"
-  [ "$edited" -eq 0 ] && [ "$behind" -eq 0 ] && ok seeds "all seeded configs match config/"
+if command -v gamemoded >/dev/null; then
+  if ! id -nG | tr ' ' '\n' | grep -qx gamemode; then warn gamemode "not in the gamemode group in this login: gamemoderun cannot renice until you log out and in"
+  else ok gamemode "group in session"; fi
 fi
 
 exit $bad

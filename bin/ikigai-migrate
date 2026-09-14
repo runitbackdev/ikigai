@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+# Replace this Arch Ikigai with the NixOS one, in place, the way boot.ps1 replaces Windows:
+# nothing leaves the disk. Gathers what the installer needs from the running box (your user
+# and password hash, hostname, timezone, keyboard, locale, GPU, git identity, the root and
+# boot partitions), downloads the installer's kexec image from the `iso` release, and boots
+# it from RAM. There `ikigai-install` empties the root filesystem of Arch and installs NixOS
+# into it, keeping /home, Docker, Bluetooth pairings, the Wi-Fi connections, the greeter
+# state, the avatars, the ssh host keys and the machine id. The user keeps their uid.
+#   curl -fsSL https://raw.githubusercontent.com/runitbackdev/ikigai/main/bin/ikigai-migrate | sudo bash
+#   sudo ikigai-migrate [--ref BRANCH] [--dry-run]
+# Runs on Arch without Nix: bash, curl, jq, kexec-tools (installed here if missing).
+set -euo pipefail
+
+ref=main dry=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --ref) ref="$2"; shift 2 ;;
+    --dry-run) dry=1; shift ;;
+    *) sed -n '2,12p' "$0" >&2; exit 2 ;;
+  esac
+done
+release="https://github.com/runitbackdev/ikigai/releases/download/iso"
+say() { printf '\e[36m==> %s\e[0m\n' "$*"; }
+die() { printf '\e[31mikigai-migrate: %s\e[0m\n' "$*" >&2; exit 1; }
+
+[ "$(id -u)" = 0 ] || die "run with sudo"
+[ -f /etc/arch-release ] || die "this is not Arch; on NixOS the flake is the way"
+[ -d /sys/firmware/efi ] || die "this machine booted in legacy BIOS mode; Ikigai needs UEFI"
+[ "$(awk '/^MemTotal/ { print int($2 / 1024 / 1024) }' /proc/meminfo)" -ge 4 ] || die "the installer runs from RAM and needs 4 GiB"
+curl -fsS -m 10 -o /dev/null https://github.com || die "no network"
+
+user="${SUDO_USER:-}"
+[ -n "$user" ] && [ "$user" != root ] || user=$(getent passwd 1000 | cut -d: -f1)
+[ -n "$user" ] || die "cannot tell which user is yours (run with sudo from your account)"
+uid=$(id -u "$user")
+hash=$(getent shadow "$user" | cut -d: -f2)
+[[ $hash == \$* ]] || die "$user has no password hash in /etc/shadow"
+
+root_uuid=$(findmnt -no UUID /) || die "no UUID for /"
+root_fs=$(findmnt -no FSTYPE /)
+[ "$root_fs" = ext4 ] || [ "$root_fs" = xfs ] || [ "$root_fs" = btrfs ] || die "root is $root_fs; expected ext4, xfs or btrfs"
+boot_uuid=$(findmnt -no UUID /boot 2>/dev/null || true)
+[ -n "$boot_uuid" ] || die "/boot is not a mounted partition; the installer needs the ESP (or XBOOTLDR) there"
+efi_uuid=$(findmnt -no UUID /efi 2>/dev/null || true)
+
+tz=$(readlink -f /etc/localtime 2>/dev/null || true); tz=${tz#/usr/share/zoneinfo/}
+keymap=$(sed -n 's/^KEYMAP=//p' /etc/vconsole.conf 2>/dev/null | tr -d '"' | head -1)
+locale=$(sed -n 's/^LANG=//p' /etc/locale.conf 2>/dev/null | tr -d '"' | head -1)
+country=$(sed -n 's/^WIRELESS_REGDOM="\(..\)"/\1/p' /etc/conf.d/wireless-regdom 2>/dev/null || true)
+gitname=$(sudo -u "$user" git config --global user.name 2>/dev/null || true)
+gitemail=$(sudo -u "$user" git config --global user.email 2>/dev/null || true)
+gpu=none
+for vendor in /sys/class/drm/card[0-9]/device/vendor; do
+  [ -r "$vendor" ] || continue
+  case "$(cat "$vendor")" in
+    0x10de) gpu=nvidia ;;
+    0x1002) [ "$gpu" = nvidia ] || gpu=amd ;;
+    0x8086) [ "$gpu" = none ] && gpu=intel ;;
+  esac
+done
+steam=false; pacman -Q steam >/dev/null 2>&1 && steam=true
+# What pacman installed on request, for the checklist the installer leaves next to the
+# flake: each is a line in nixpkgs or a leftover in $HOME, never carried over as files.
+packages=$(pacman -Qqe 2>/dev/null | jq -R . | jq -sc .)
+
+facts=$(jq -n --arg host "$(hostname)" --arg user "$user" --argjson uid "$uid" --arg hash "$hash" \
+  --arg tz "${tz:-UTC}" --arg keymap "${keymap:-us}" --arg locale "${locale:-en_US.UTF-8}" --arg country "$country" \
+  --arg gpu "$gpu" --argjson steam "$steam" --arg gitname "${gitname:-$user}" --arg gitemail "$gitemail" \
+  --arg root "$root_uuid" --arg boot "$boot_uuid" --arg efi "$efi_uuid" --argjson packages "${packages:-[]}" \
+  '{host: $host, user: $user, uid: $uid, hashedPassword: $hash, timeZone: $tz, keyMap: $keymap, locale: $locale,
+    wifiCountry: $country, gpu: $gpu, steam: $steam, gitName: $gitname, gitEmail: $gitemail,
+    root: $root, boot: $boot, efi: $efi, packages: $packages}')
+say "this box"
+jq 'del(.hashedPassword, .packages)' <<<"$facts" | sed 's/^/  /'
+echo "  $(jq '.packages | length' <<<"$facts") packages pacman installed on request; their names go to /etc/nixos/arch-packages.txt"
+echo
+echo "  Ikigai on NixOS replaces Arch inside the root filesystem. Kept: /home, /root, Docker,"
+echo "  Bluetooth, NetworkManager, /var/lib/ikigai, avatars, ssh host keys, /opt, /srv. Everything"
+echo "  else on / and every kernel and entry on /boot go. Nothing is backed up: if it matters and"
+echo "  is not in that list, copy it now."
+echo
+[ "$dry" = 1 ] && { say "dry run: stopping here"; exit 0; }
+read -r -p "Type the hostname ($(hostname)) to continue: " confirm
+[ "$confirm" = "$(hostname)" ] || die "not confirmed"
+
+command -v kexec >/dev/null || { say "installing kexec-tools"; pacman -S --needed --noconfirm kexec-tools; }
+work=/var/tmp/ikigai-kexec
+mkdir -p "$work"; cd "$work"
+say "fetching the installer's kexec image"
+curl -fsSL -o ikigai-kexec.tar.gz.sha256 "$release/ikigai-kexec.tar.gz.sha256"
+if ! sha256sum -c --quiet ikigai-kexec.tar.gz.sha256 2>/dev/null; then
+  curl -fL --progress-bar -o ikigai-kexec.tar.gz "$release/ikigai-kexec.tar.gz"
+  sha256sum -c --quiet ikigai-kexec.tar.gz.sha256 || die "the downloaded image does not match its checksum"
+fi
+tar -xzf ikigai-kexec.tar.gz
+[ -f bzImage ] && [ -f initrd.gz ] && [ -f kexec-boot ] || die "the image is missing bzImage, initrd.gz or kexec-boot"
+# The image's own command line (its init and parameters), plus what the installer reads.
+cmdline=$(sed -n 's/.*--command-line "\(.*\)".*/\1/p' kexec-boot | head -1)
+[ -n "$cmdline" ] || die "no command line in kexec-boot"
+cmdline="$cmdline ikigai.mode=migrate ikigai.ref=$ref ikigai.root=UUID=$root_uuid"
+
+# The facts, root-only, where the installer finds them once it has mounted the root.
+printf '%s\n' "$facts" > /ikigai-migrate.json
+chmod 600 /ikigai-migrate.json
+sync
+
+say "booting the installer (kexec); the console comes back as the installer in a few seconds"
+kexec --load bzImage --initrd=initrd.gz --command-line "$cmdline"
+systemctl kexec

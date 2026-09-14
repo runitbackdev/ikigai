@@ -5,7 +5,7 @@
 # satty as its Edit action), else grim, slurp and gpu-screen-recorder directly.
 set -euo pipefail
 
-SHELL_QML=/usr/local/share/ikigai/shell/shell.qml
+SHELL_QML=@shell@/shell.qml
 # `just shell` (a working-tree shell) leaves its path here while it runs.
 DEV_SHELL=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ikigai/dev-shell
 [ -r "$DEV_SHELL" ] && SHELL_QML=$(cat "$DEV_SHELL")

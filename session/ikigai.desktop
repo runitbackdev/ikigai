@@ -1,6 +1,0 @@
-[Desktop Entry]
-Name=Ikigai
-Comment=cosmic-comp with the Ikigai shell
-Exec=/usr/local/bin/ikigai-session
-Type=Application
-DesktopNames=COSMIC

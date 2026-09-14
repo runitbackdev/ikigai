@@ -14,10 +14,10 @@ dev="$run/dev-shell"
 [ -n "${WAYLAND_DISPLAY:-}" ] || { echo "dev-shell: not inside a Wayland session" >&2; exit 1; }
 [ -r "$dev" ] && { echo "dev-shell: already running from $(cat "$dev")" >&2; exit 1; }
 
-# The blob plugin comes from the installed prefix (install/session.sh builds it); only the
-# QML is live. A plugin change still needs `just install session`.
-plugin=/usr/local/lib/qt6/qml
-[ -d "$plugin/Ikigai" ] || echo "dev-shell: no plugin under $plugin; run: just install session" >&2
+# The plugins come from the system profile (ikigai-shell-plugins); only the QML is live.
+# A plugin change is a rebuild: `just build ikigai-shell-plugins`, then ikigai-update.
+plugin=${IKIGAI_QML:-/run/current-system/sw/lib/qt6/qml}
+[ -d "$plugin/Ikigai" ] || echo "dev-shell: no plugin under $plugin (IKIGAI_QML to point elsewhere)" >&2
 
 was_active=0
 systemctl --user -q is-active ikigai-shell.service && was_active=1

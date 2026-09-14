@@ -1,2 +1,4 @@
 tools/*/target/
 session/target/
+result
+result-*

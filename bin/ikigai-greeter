@@ -1,10 +1,11 @@
 #!/bin/bash
 # greetd's greeter command: cosmic-comp in kiosk mode with the Quickshell greeter as its
 # only client. cosmic-comp exits with it, and greetd then starts the chosen session.
-# greetd discards the greeter's output; send it to the journal instead.
+# greetd discards the greeter's output; send it to the journal instead. The theme and the
+# cursors are read from the system profile, where every theme package puts them.
 exec > >(systemd-cat -t ikigai-greeter) 2>&1
 export QT_QPA_PLATFORM=wayland QT_QPA_PLATFORMTHEME='' QS_DISABLE_FILE_WATCHER=1
-export QML_IMPORT_PATH=/usr/local/lib/qt6/qml
-export IKIGAI_THEME_FILE=/usr/local/share/ikigai/theme/shell.json
-export XCURSOR_THEME=Ikigai XCURSOR_SIZE=24 XCURSOR_PATH=/usr/local/share/icons:/usr/share/icons
-exec cosmic-comp --no-xwayland qs -p /usr/local/share/ikigai/shell/greeter.qml
+export QML_IMPORT_PATH=@qml@
+export IKIGAI_THEME_FILE=/run/current-system/sw/share/ikigai/theme/shell.json
+export XCURSOR_THEME=Ikigai XCURSOR_SIZE=24 XCURSOR_PATH=/run/current-system/sw/share/icons
+exec cosmic-comp --no-xwayland qs -p @shell@/greeter.qml

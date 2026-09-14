@@ -1,45 +1,27 @@
 #!/usr/bin/env bash
-# Steam, on demand: the client, Proton's fonts, the 32-bit driver for this machine's GPU
-# (multilib is enabled at install), and gamemode, gamescope and mangohud for launch
-# options. Proton ships with Steam: turn on Steam Play for all titles in Settings.
+# Steam, once `ikigai.steam.enable = true` in the flake has put it on the box with gamemode,
+# gamescope, mangohud and the 32-bit driver: checks the gamemode group reached this login,
+# pins Steam to the rail, and launches it. Proton ships with Steam: turn on Steam Play for
+# all titles in Settings; Proton-GE is installed next to it.
 set -euo pipefail
 
-gpu=$(cat "${IKIGAI_STATE:-$HOME/.local/state/ikigai}/gpu" 2>/dev/null || echo none)
-packages=(steam ttf-liberation gamemode gamescope mangohud)
-case "$gpu" in
-  nvidia) pacman -Q lib32-nvidia-580xx-utils >/dev/null 2>&1 || packages+=(lib32-nvidia-utils) ;;   # the 580xx pin brings its own lib32 (install/packages.sh)
-  amd)    packages+=(lib32-mesa lib32-vulkan-radeon) ;;
-  intel)  packages+=(lib32-mesa lib32-vulkan-intel) ;;
-  *)      packages+=(lib32-mesa lib32-vulkan-swrast) ;;   # no GPU: software rendering, pacman would otherwise ask
-esac
-
-sudo pacman -S --needed "${packages[@]}"
-# gamemode renices a game to -10 (/etc/security/limits.d/10-gamemode.conf) for members of its
-# group only; groups are read at login, so the first gamemoderun after this install still runs
-# the game at nice 0. Its own renice defaults to 0: config/gamemode/gamemode.ini turns it on,
-# seeded once and yours to edit after.
-if ! getent group gamemode | grep -qw "$USER"; then
-  sudo usermod -aG gamemode "$USER"
+if ! command -v steam >/dev/null; then
+  echo "Steam is not installed. In your flake: ikigai.steam.enable = true; then ikigai-update." >&2
+  exit 1
 fi
+# gamemode renices a game to -10 for members of its group only; groups are read at login.
 if ! id -nG | tr ' ' '\n' | grep -qx gamemode; then
-  echo "you are in the gamemode group but this login is not: log out and back in before gamemoderun can renice"
+  echo "this login is not in the gamemode group: log out and back in before gamemoderun can renice"
 fi
-gm="${XDG_CONFIG_HOME:-$HOME/.config}/gamemode.ini"
-if [ ! -e "$gm" ]; then
-  install -Dm644 "${IKIGAI_PATH:-$HOME/.local/share/ikigai}/config/gamemode/gamemode.ini" "$gm" && echo "seeded $gm"
-fi
-echo
-echo "Steam installed (gpu: $gpu). Launch options worth knowing:"
+echo "Launch options worth knowing:"
 echo "  gamemoderun %command%            nice -10 and the performance governor while the game runs"
 echo "  mangohud %command%               fps and hardware overlay"
 echo "  gamescope -f -- %command%        nested session: forced resolution, FSR, sane fullscreen"
-echo "Proton-GE: protonup-qt (AUR) installs community Proton builds Steam can pick per game."
 # Pin Steam to the rail, once. The shell watches shell.json, so this lands live.
 cfg="${XDG_CONFIG_HOME:-$HOME/.config}/ikigai/shell.json"
 if [ -f "$cfg" ] && ! jq -e '([(.pinned.top // [])[], (.pinned.bottom // [])[]] | index("steam")) != null' "$cfg" >/dev/null; then
   tmp=$(mktemp "$cfg.XXXXXX")
   jq '.pinned.bottom = ((.pinned.bottom // []) + ["steam"])' "$cfg" > "$tmp" && mv "$tmp" "$cfg" || rm -f "$tmp"
 fi
-
 [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && setsid steam >/dev/null 2>&1 &
 exit 0

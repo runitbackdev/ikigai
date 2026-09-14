@@ -1,9 +1,0 @@
-[Unit]
-Description=Ikigai idle watcher (cosmic-idle)
-PartOf=ikigai-session.target
-After=graphical-session-pre.target
-
-[Service]
-ExecStart=/usr/bin/cosmic-idle
-Restart=on-failure
-RestartSec=1

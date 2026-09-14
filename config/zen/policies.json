@@ -1,9 +1,0 @@
-{
-  "policies": {
-    "DisableAppUpdate": true,
-    "DefaultSerialGuardSetting": 3,
-    "Preferences": {
-      "general.autoScroll": { "Value": true, "Status": "default" }
-    }
-  }
-}
