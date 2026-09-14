@@ -80,7 +80,10 @@ AppImages directly.
 `ikigai.gpu = "nvidia"` picks the driver. `ikigai.nvidia.pin580` (on by default) keeps
 `hardware.nvidia.package` on the `legacy_580` branch with the proprietary modules: the
 610.x open modules crash Proton games with Xid 109. `ikigai-doctor` nags while the pin is
-in. Idle-suspend on AC is off everywhere, since resume on NVIDIA is not set up.
+in. Sleep is set up (`hardware.nvidia.powerManagement.enable`): the driver keeps video
+memory across suspend and its suspend, resume and hibernate services run, so the
+compositor wakes to a GPU that still has its state. Not yet seen on hardware; idle-suspend
+on AC stays off in the COSMIC config until it has.
 
 ## Gaming
 
