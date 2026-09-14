@@ -15,6 +15,11 @@ cosmic-comp.overrideAttrs (finalAttrs: old: {
     inherit (finalAttrs) src;
     hash = "sha256-SMyY4YCa7Zx+sfDGq4c35kngCMnU38f4Lq/4XcM3nZI=";
   };
+  # Thin LTO, as Arch's package built it: fat LTO on the test binary takes more memory than
+  # a CI runner has, and the runner dies mid-link.
+  postPatch = (old.postPatch or "") + ''
+    substituteInPlace Cargo.toml --replace-fail 'lto = "fat"' 'lto = "thin"'
+  '';
   # Upstream's update script keys on epoch tags; the fork has none.
   passthru = (old.passthru or { }) // { updateScript = null; };
 })
