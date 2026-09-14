@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Task Manager
+Comment=What is using the CPU, memory and GPU; end a task
+Icon=utilities-system-monitor
+Exec=ikigai-shell monitor open
+Terminal=false
+Categories=System;Monitor;
+Keywords=processes;performance;cpu;memory;gpu;kill;btop;

@@ -29,5 +29,7 @@ lib.hiPrio (
     done
 
     install -m644 ${../../config/applications/mimeapps.list} $out/share/applications/mimeapps.list
+    # The task manager, for Vicinae: the card, not a window.
+    install -m644 ${../../config/applications/ikigai-monitor.desktop} $out/share/applications/ikigai-monitor.desktop
   ''
 )

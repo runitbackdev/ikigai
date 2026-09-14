@@ -69,6 +69,7 @@
         inherit (pkgs)
           cosmic-comp
           ikigai-session
+          ikigai-monitor
           ikigai-shell
           ikigai-shell-plugins
           ikigai-theme
@@ -128,6 +129,7 @@
         inherit (self.packages.${system})
           cosmic-comp
           ikigai-session
+          ikigai-monitor
           ikigai-shell
           ikigai-shell-plugins
           ikigai-theme

@@ -71,7 +71,7 @@ jobs:
       - name: Packages
         run: |
           nix build --accept-flake-config -L --no-link \
-            .#ikigai-session .#ikigai-shell-plugins .#ikigai-shell .#ikigai-theme .#ikigai-icons \
+            .#ikigai-session .#ikigai-monitor .#ikigai-shell-plugins .#ikigai-shell .#ikigai-theme .#ikigai-icons \
             .#ikigai-cosmic-config .#ikigai-commands .#ikigai-install .#phosphor-font .#zen
 
   system:

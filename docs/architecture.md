@@ -113,8 +113,9 @@ defaults with an option each: `ikigai.gpu`, `ikigai.theme`, `ikigai.steam.enable
 
 `nix/home/default.nix` is the Home Manager module, applied to `ikigai.user` through
 `home-manager.sharedModules`. `nix/pkgs/` is the overlay: the compositor fork, the shell,
-its plugins, the session crate, the theme, the icons, the commands, the fonts, `zen` and
-`zed`.
+its plugins, the session crate, the task manager's monitor crate (`monitor/`, GPL like
+the shell, since it links Mission Center's wire types), the theme, the icons, the
+commands, the fonts, `zen` and `zed`.
 
 ## Installer
 

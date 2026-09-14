@@ -40,6 +40,7 @@ in
         ikigai-shell
         ikigai-shell-plugins
         ikigai-session
+        ikigai-monitor
         ikigai-icons
         ikigai-cosmic-config
         cfg.themePackage

@@ -38,6 +38,12 @@ Lock 1.0 Lock.qml
 Polkit 1.0 Polkit.qml
 Welcome 1.0 Welcome.qml
 Launcher 1.0 Launcher.qml
+Drop 1.0 Drop.qml
+Monitor 1.0 Monitor.qml
+MonitorProcesses 1.0 MonitorProcesses.qml
+MonitorPerformance 1.0 MonitorPerformance.qml
+Graph 1.0 Graph.qml
+singleton Units 1.0 Units.qml
 Restore 1.0 Restore.qml
 singleton Notifs 1.0 Notifs.qml
 Toast 1.0 Toast.qml

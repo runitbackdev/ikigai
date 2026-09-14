@@ -42,6 +42,29 @@ Vicinae on `Super`: apps, files, clipboard history, power commands. It drops out
 frame's top border as a card; Escape, a launch or a click beside it lifts it back.
 `ikigai-shell launcher toggle`.
 
+## Task manager
+
+`Ctrl+Shift+Escape`, Task Manager in Vicinae, or `ikigai-shell monitor toggle`. The same
+drop as the launcher, with two pages:
+
+- Processes: apps first, each a row with its processes under a caret and its numbers
+  summed, then everything else under Background processes. Name, PID, CPU, memory, GPU and
+  GPU memory; a click on a column sorts, and the sort holds while the card is up. Typing
+  searches by name or PID. End task sends TERM to the selected row's processes, Force stop
+  sends KILL; `Delete` and `Shift+Delete` do the same. The cell tint is the heat map.
+- Performance: CPU, memory and each GPU down the left with a minute of history, the chosen
+  one on the right with its graph and numbers. A click on the CPU graph shows every logical
+  processor.
+
+`Ctrl+Tab` flips the page. An app is a window's app id matched to processes by the binary
+its desktop entry runs, plus their descendants; the rest is background.
+
+The numbers are Mission Center's: `ikigai-monitor` (`monitor/`, Rust) runs its data daemon
+(`missioncenter-magpie`, from nixpkgs' mission-center) for as long as the card is open, asks
+it over its nng socket for the CPU, memory, GPUs, processes and apps once a second (twice on
+Performance) and prints each sample as a JSON line, which `Monitor.qml` reads. Nothing runs
+while the card is closed.
+
 ## Switcher
 
 `Alt+Tab`, Windows-style. Hold Alt, Tab cycles live previews most-recent-first across

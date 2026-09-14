@@ -5,6 +5,7 @@ final: prev: {
   cosmic-comp = final.callPackage ./cosmic-comp.nix { cosmic-comp = prev.cosmic-comp; };
 
   ikigai-session = final.callPackage ./ikigai-session.nix { };
+  ikigai-monitor = final.callPackage ./ikigai-monitor.nix { };
   ikigai-shell-plugins = final.callPackage ./ikigai-shell-plugins.nix { };
   ikigai-shell = final.callPackage ./ikigai-shell.nix { };
   ikigai-theme = final.callPackage ./ikigai-theme.nix { };

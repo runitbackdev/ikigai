@@ -4,4 +4,5 @@
     (modifiers: [Shift], key: "Print", description: Some("Screenshot of the whole screen")): Spawn("ikigai-shot screen"),
     (modifiers: [Super, Shift], key: "r", description: Some("Record the screen (again to stop)")): Spawn("ikigai-shot record"),
     (modifiers: [Super, Shift], key: "slash", description: Some("Keybinding cheatsheet")): Spawn("ghostty --title=Keys -e ikigai-keys --fzf"),
+    (modifiers: [Ctrl, Shift], key: "Escape", description: Some("Task manager")): Spawn("ikigai-shell monitor toggle"),
 }
