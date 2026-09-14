@@ -136,7 +136,9 @@ The same live system is a kexec image (`nix/kexec.nix`, a kernel and an initrd t
 carries the whole system). `bin/ikigai-migrate`, run with sudo on an Arch Ikigai, gathers
 the box's facts (user, uid, password hash, hostname, timezone, keyboard, locale, GPU, git
 identity, the root and boot partitions) into `/ikigai-migrate.json`, fetches the image from
-the `iso` release and kexecs into it. The installer, in `ikigai.mode=migrate`, mounts that
+the `iso` release and kexecs into it; with the nvidia driver loaded a kexec'd kernel gets no
+display, so there (or with `--firmware`) the image is staged on `/boot` as a one-shot
+systemd-boot entry and the box reboots through the firmware once instead. The installer, in `ikigai.mode=migrate`, mounts that
 root, removes everything of Arch from it while keeping `/home`, `/root`, `/opt`, `/srv`,
 Docker, Bluetooth, NetworkManager, `/var/lib/ikigai`, the avatars, the machine id and the
 ssh host keys, empties `/boot` of Arch's kernels and entries (Windows' files stay), writes

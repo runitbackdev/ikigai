@@ -6,17 +6,21 @@
 # it from RAM. There `ikigai-install` empties the root filesystem of Arch and installs NixOS
 # into it, keeping /home, Docker, Bluetooth pairings, the Wi-Fi connections, the greeter
 # state, the avatars, the ssh host keys and the machine id. The user keeps their uid.
+# With the nvidia driver loaded a kexec'd kernel gets no display (the installer runs on a
+# black screen), so on those boxes, or with --firmware, the same image is staged on /boot as
+# a one-shot systemd-boot entry and the box reboots through the firmware once instead.
 #   curl -fsSL https://raw.githubusercontent.com/runitbackdev/ikigai/main/bin/ikigai-migrate | sudo bash
-#   sudo ikigai-migrate [--ref BRANCH] [--dry-run]
+#   sudo ikigai-migrate [--ref BRANCH] [--firmware] [--dry-run]
 # Runs on Arch without Nix: bash, curl, jq, kexec-tools (installed here if missing).
 set -euo pipefail
 
-ref=main dry=0
+ref=main dry=0 firmware=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --ref) ref="$2"; shift 2 ;;
+    --firmware) firmware=1; shift ;;
     --dry-run) dry=1; shift ;;
-    *) sed -n '2,12p' "$0" >&2; exit 2 ;;
+    *) sed -n '2,15p' "$0" >&2; exit 2 ;;
   esac
 done
 release="https://github.com/runitbackdev/ikigai/releases/download/iso"
@@ -47,6 +51,12 @@ ls -A /boot /efi >/dev/null 2>&1 || true
 boot_uuid=$(findmnt --real -no UUID /boot 2>/dev/null || true)
 [ -n "$boot_uuid" ] || die "/boot is not a mounted partition; the installer needs the ESP (or XBOOTLDR) there"
 efi_uuid=$(findmnt --real -no UUID /efi 2>/dev/null || true)
+# How the installer gets booted: kexec straight from here, or one trip through the firmware
+# when the nvidia driver holds the GPU. That needs systemd-boot reading entries from /boot.
+[ -d /sys/module/nvidia ] && firmware=1
+if [ "$firmware" = 1 ]; then
+  [ -d /boot/loader/entries ] || die "booting the installer through the firmware needs systemd-boot reading entries from /boot"
+fi
 
 tz=$(readlink -f /etc/localtime 2>/dev/null || true); tz=${tz#/usr/share/zoneinfo/}
 keymap=$(sed -n 's/^KEYMAP=//p' /etc/vconsole.conf 2>/dev/null | tr -d '"' | head -1)
@@ -84,11 +94,12 @@ echo "  Bluetooth, NetworkManager, /var/lib/ikigai, avatars, ssh host keys, /opt
 echo "  else on / and every kernel and entry on /boot go. Nothing is backed up: if it matters and"
 echo "  is not in that list, copy it now."
 echo
+[ "$firmware" = 1 ] && echo "  The installer boots through the firmware (nvidia holds the GPU across a kexec): one reboot, then it runs on tty1." && echo
 [ "$dry" = 1 ] && { say "dry run: stopping here"; exit 0; }
 read -r -p "Type the hostname ($host) to continue: " confirm
 [ "$confirm" = "$host" ] || die "not confirmed"
 
-command -v kexec >/dev/null || { say "installing kexec-tools"; pacman -S --needed --noconfirm kexec-tools; }
+[ "$firmware" = 1 ] || command -v kexec >/dev/null || { say "installing kexec-tools"; pacman -S --needed --noconfirm kexec-tools; }
 work=/var/tmp/ikigai-kexec
 mkdir -p "$work"; cd "$work"
 say "fetching the installer's kexec image"
@@ -109,6 +120,20 @@ printf '%s\n' "$facts" > /ikigai-migrate.json
 chmod 600 /ikigai-migrate.json
 sync
 
-say "booting the installer (kexec); the console comes back as the installer in a few seconds"
-kexec --load bzImage --initrd=initrd.gz --command-line "$cmdline"
-systemctl kexec
+if [ "$firmware" = 1 ]; then
+  # The image on the ESP as a loader entry, booted once; the installer empties /boot after.
+  need=$(( ($(stat -c %s bzImage) + $(stat -c %s initrd.gz)) / 1024 + 1024 ))
+  [ "$(df --output=avail -k /boot | tail -1)" -ge "$need" ] || die "/boot needs $((need / 1024)) MiB free for the installer image"
+  say "staging the installer on /boot as a one-shot boot entry"
+  mkdir -p /boot/ikigai-installer
+  cp bzImage initrd.gz /boot/ikigai-installer/
+  printf 'title Ikigai installer\nlinux /ikigai-installer/bzImage\ninitrd /ikigai-installer/initrd.gz\noptions %s\n' "$cmdline" > /boot/loader/entries/ikigai-installer.conf
+  sync
+  bootctl set-oneshot ikigai-installer.conf || die "bootctl could not set the one-shot entry"
+  say "rebooting into the installer; it runs on tty1 after the firmware"
+  systemctl reboot
+else
+  say "booting the installer (kexec); the console comes back as the installer in a few seconds"
+  kexec --load bzImage --initrd=initrd.gz --command-line "$cmdline"
+  systemctl kexec
+fi

@@ -47,7 +47,9 @@ Docker, Bluetooth, Wi-Fi, avatars, ssh host keys and your uid:
 curl -fsSL https://raw.githubusercontent.com/runitbackdev/ikigai/main/bin/ikigai-migrate | sudo bash
 ```
 
-It shows what it found and asks for the hostname to confirm; `--dry-run` stops there.
+It shows what it found and asks for the hostname to confirm; `--dry-run` stops there. A box
+with the nvidia driver loaded reboots through the firmware into the installer (a kexec'd
+kernel gets no display there); `--firmware` asks for that on any box.
 
 On NixOS already:
 
