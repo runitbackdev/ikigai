@@ -10,6 +10,8 @@
 }:
 {
   system.stateVersion = "25.11";
+  # The installer profiles carry ZFS; no root pool to force-import here.
+  boot.zfs.forceImportRoot = false;
   networking.networkmanager.enable = lib.mkForce true;
   networking.wireless.enable = lib.mkForce false;
 
