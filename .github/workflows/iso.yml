@@ -17,6 +17,11 @@ on:
 permissions:
   contents: write
 
+# One ISO build at a time; a newer trigger replaces an older one still running.
+concurrency:
+  group: iso
+  cancel-in-progress: true
+
 jobs:
   iso:
     runs-on: ubuntu-latest
