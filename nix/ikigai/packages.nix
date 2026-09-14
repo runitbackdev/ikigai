@@ -20,6 +20,12 @@ in
       zip
       unzip
       openssh
+      # What Arch's base-devel gave: a crate's build.rs, a pip C extension, an npm native
+      # module all expect cc, make and pkg-config on PATH, whatever toolchain mise fetched.
+      gcc
+      gnumake
+      pkg-config
+      binutils
       brightnessctl
       wl-clipboard
       grim

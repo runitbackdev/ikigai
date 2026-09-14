@@ -58,6 +58,7 @@ in
       jq
       fastfetch
       python3
+      rustup
       zip
       unzip
     ];
