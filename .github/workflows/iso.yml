@@ -1,11 +1,13 @@
-# The installer ISO, published to the rolling `iso` GitHub release: boot.ps1 and a USB
-# stick fetch it from there. Runs on a tag, by hand, or when the ISO's inputs change on main.
+# The installer ISO and the kexec image, published to the rolling `iso` GitHub release:
+# boot.ps1 and a USB stick fetch the ISO, ikigai-migrate on an Arch box the kexec image.
+# Runs by hand, or when the installer's inputs change on main.
 name: iso
 on:
   push:
     branches: [main]
     paths:
       - nix/iso.nix
+      - nix/kexec.nix
       - nix/installer/**
       - templates/**
       - flake.lock
@@ -30,7 +32,9 @@ jobs:
         run: |
           nix build --accept-flake-config -L .#iso
           mkdir -p out && cp result/iso/ikigai-x86_64.iso out/
-          (cd out && sha256sum ikigai-x86_64.iso > ikigai-x86_64.iso.sha256)
+          nix build --accept-flake-config -L .#kexec -o result-kexec
+          tar -chzf out/ikigai-kexec.tar.gz -C result-kexec bzImage initrd.gz kexec-boot
+          (cd out && sha256sum ikigai-x86_64.iso > ikigai-x86_64.iso.sha256 && sha256sum ikigai-kexec.tar.gz > ikigai-kexec.tar.gz.sha256)
           ls -la out
       - name: Publish
         env:
@@ -38,5 +42,5 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           gh release view iso >/dev/null 2>&1 || gh release create iso --title "Ikigai installer" \
-            --notes "The installer ISO, rebuilt by CI. Write it to a USB stick, or run boot.ps1 from Windows."
-          gh release upload iso --clobber out/ikigai-x86_64.iso out/ikigai-x86_64.iso.sha256
+            --notes "The installer, rebuilt by CI: the ISO for a USB stick or boot.ps1, the kexec image for ikigai-migrate."
+          gh release upload iso --clobber out/ikigai-x86_64.iso out/ikigai-x86_64.iso.sha256 out/ikigai-kexec.tar.gz out/ikigai-kexec.tar.gz.sha256

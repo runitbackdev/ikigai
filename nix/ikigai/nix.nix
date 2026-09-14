@@ -18,7 +18,7 @@ in
       auto-optimise-store = true;
       trusted-users = [ "@wheel" ];
       substituters = [ "https://ikigai-desktop.cachix.org" ];
-      trusted-public-keys = [ "ikigai-desktop.cachix.org-1:REPLACE_WITH_THE_KEY_FROM_APP_CACHIX_ORG" ];
+      trusted-public-keys = [ "ikigai-desktop.cachix.org-1:U+xIEO/ryk/+zJxA6nYXJTFdaT7uIu2VY3DkqhLX2B4=" ];
     };
     nix.gc = {
       automatic = true;

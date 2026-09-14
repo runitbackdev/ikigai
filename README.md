@@ -39,6 +39,16 @@ once. Windows is untouched until you confirm the disk in `ikigai-install`; `-Und
 before that puts everything back. After a dual boot, run it once with `-Clean` from
 Windows.
 
+On Arch Ikigai already, in place. Nothing leaves the disk: the installer boots from RAM
+over the running system, empties the root of Arch and installs into it, keeping your home,
+Docker, Bluetooth, Wi-Fi, avatars, ssh host keys and your uid:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/runitbackdev/ikigai/main/bin/ikigai-migrate | sudo bash
+```
+
+It shows what it found and asks for the hostname to confirm; `--dry-run` stops there.
+
 On NixOS already:
 
 ```sh
@@ -98,7 +108,6 @@ Log out, power off, reboot and sleep are Vicinae commands: `Super`, type the wor
 | `ikigai-caffeinate` | keep the screen on: until Ctrl-C, `-t 90m`, `-w PID`, or around a command |
 | `ikigai-shot` | `region`, `screen` or `record` |
 | `ikigai-steam` | Steam, once `ikigai.steam.enable` put it there; pins it to the rail |
-| `ikigai-migrate export\|import` | an Arch Ikigai's Wi-Fi, greeter state, avatars and Docker volumes onto the NixOS one |
 | `ikigai-shell welcome open` | the first-login card again |
 
 ## Docs

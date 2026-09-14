@@ -8,10 +8,10 @@
 | `nix/ikigai/` | the NixOS module, one file per concern |
 | `nix/home/` | the Home Manager module: every app config |
 | `nix/pkgs/` | the overlay and the packages: the compositor fork, the shell, the session crate, the theme, the commands |
-| `nix/iso.nix`, `nix/installer/` | the installer ISO and `ikigai-install` |
+| `nix/iso.nix`, `nix/kexec.nix`, `nix/installer/` | the installer ISO, the same as a kexec image, `ikigai-install` and the live system they share |
 | `hosts/example` | the host CI builds and `just vm` boots |
 | `templates/personal` | the personal flake the installer writes to `/etc/nixos` |
-| `bin/` | the `ikigai-*` commands, packaged by `nix/pkgs/commands.nix` |
+| `bin/` | the `ikigai-*` commands, packaged by `nix/pkgs/commands.nix`; `ikigai-migrate` runs on the Arch side and is not |
 | `config/` | the app configs the home module installs, COSMIC's system config, `mimeapps.list` |
 | `shell/` | the Quickshell shell, greeter and lock included. `plugin/blobs` is vendored |
 | `session/` | Rust: `ikigai-session`, `ikigai-bridge`, `ikigai-outputs`. Their units are in `nix/ikigai/session.nix` |
@@ -63,13 +63,13 @@ Add a row to `THIRD_PARTY.md` when adding either kind.
 `ci.yml` on every push: shellcheck at warning, `nix flake check`, a build of every
 package and of the example system, and a push of what was built to the `ikigai-desktop`
 Cachix cache. Pushing needs the `CACHIX_AUTH_TOKEN` secret; without it the build runs
-and nothing is pushed. `iso.yml` builds the ISO and uploads it to the rolling `iso`
-GitHub release when the ISO's inputs change on main, or by hand from the Actions tab.
+and nothing is pushed. `iso.yml` builds the ISO and the kexec image (`ikigai-kexec.tar.gz`, what
+`ikigai-migrate` fetches) and uploads both to the rolling `iso` GitHub release when the
+installer's inputs change on main, or by hand from the Actions tab.
 
 The cache is `https://ikigai-desktop.cachix.org`. Its public key is set in `flake.nix`
-(`nixConfig`), `nix/ikigai/nix.nix` and `nix/iso.nix`, a placeholder until the key
-from app.cachix.org is pasted in. Until then every install compiles the compositor, the
-session crate and the shell plugins itself.
+(`nixConfig`), `nix/ikigai/nix.nix` and `nix/installer/live.nix`. Until CI has pushed
+once, every install compiles the compositor, the session crate and the shell plugins itself.
 
 ## The forks
 

@@ -7,7 +7,8 @@ the pacman repo) is retired. The desktop is a NixOS module (`nix/ikigai`), every
 is a full Home Manager module (`nix/home`), the compositor fork is an overlay over nixpkgs'
 cosmic-comp built into the `ikigai-desktop` Cachix cache. A box is a separate personal
 flake (`templates/personal`) that `ikigai-install` writes to `/etc/nixos`; `ikigai-migrate`
-carries the rest of an Arch box over. Left to verify on hardware: the ISO and `boot.ps1`
+turns an Arch box into one in place, kexec into the installer and the root emptied around
+the home. Left to verify on hardware: the ISO and `boot.ps1`
 boot, the installer's two modes, the greeter and session under the fork, NVIDIA's 580
 pin, `nix run .#vm`, and the cache once its key is pasted in. Everything below is history.
 

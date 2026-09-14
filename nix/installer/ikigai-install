@@ -1,10 +1,13 @@
-# The Ikigai installer, run by the ISO on tty1 (nix/iso.nix). Asks for the disk, a user,
-# a password, a hostname and a timezone, writes a personal flake (templates/personal) to
-# /etc/nixos of the new system and runs nixos-install from it. From boot.ps1 the mode and
-# the disk come from the kernel command line; from a stick it asks.
+# The Ikigai installer, run by the ISO or the kexec image on tty1 (nix/installer/live.nix).
+# Asks for the disk, a user, a password, a hostname and a timezone, writes a personal flake
+# (templates/personal) to /etc/nixos of the new system and runs nixos-install from it. From
+# boot.ps1 and ikigai-migrate the mode comes from the kernel command line; from a stick it asks.
 #   ikigai.mode=replace   wipe the disk: an ESP and a root
 #   ikigai.mode=dual      keep Windows: /boot and a root in the largest free region,
 #                         Windows' own ESP mounted at /efi for the loader
+#   ikigai.mode=migrate   an Arch Ikigai, in place: empty its root of Arch and install into
+#                         it, keeping the home and the state; the facts in its
+#                         /ikigai-migrate.json (ikigai-migrate wrote them), ikigai.root= names it
 #   ikigai.ref=<branch>   which Ikigai to install (main)
 
 say() { printf '\e[36m==> %s\e[0m\n' "$*"; }
@@ -14,7 +17,7 @@ ask() { # ask VAR "prompt" "default"
   local v; read -r -p "$2${3:+ [$3]}: " v; printf -v "$1" '%s' "${v:-$3}";
 }
 
-choice="" disk="" hostname="" username="" timezone="" keymap="" gitname="" gitemail=""
+choice="" disk="" hostname="" username="" timezone="" keymap="" gitname="" gitemail="" uid="" locale="" country="" steam="" efi_part="" efi_mount=""
 [ "$(id -u)" = 0 ] || die "run as root"
 [ -d /sys/firmware/efi ] || die "this machine booted in legacy BIOS mode; Ikigai needs UEFI"
 mode="$(param ikigai.mode)"
@@ -30,15 +33,39 @@ until curl -fsS -m 10 -o /dev/null https://github.com; do
   read -r _
 done
 
+# ---- migrate: the facts come from the Arch box ------------------------------------------
+migrate_root="$(param ikigai.root)"
+facts=""
+if [ "$mode" = migrate ]; then
+  [ -n "$migrate_root" ] || die "ikigai.mode=migrate without ikigai.root="
+  udevadm settle
+  root_part=$(blkid -l -o device -t "$migrate_root") || die "no partition for $migrate_root"
+  mkdir -p /mnt && mount "$root_part" /mnt
+  [ -f /mnt/ikigai-migrate.json ] || die "no /ikigai-migrate.json on $root_part; run ikigai-migrate on the Arch side first"
+  facts=$(cat /mnt/ikigai-migrate.json)
+  fact() { jq -r --arg k "$1" '.[$k] // empty' <<<"$facts"; }
+  hostname=$(fact host); username=$(fact user); uid=$(fact uid); hashed=$(fact hashedPassword)
+  timezone=$(fact timeZone); keymap=$(fact keyMap); locale=$(fact locale); country=$(fact wifiCountry)
+  gpu=$(fact gpu); steam=$(fact steam); gitname=$(fact gitName); gitemail=$(fact gitEmail)
+  boot_part=$(blkid -l -o device -t "UUID=$(fact boot)") || die "no partition for the boot UUID"
+  efi_part=""; [ -n "$(fact efi)" ] && efi_part=$(blkid -l -o device -t "UUID=$(fact efi)")
+  disk="/dev/$(lsblk -no pkname "$root_part")"
+  say "migrating $hostname on $root_part (boot $boot_part${efi_part:+, efi $efi_part}); user $username ($uid), gpu $gpu"
+  echo "  Arch goes from the root filesystem; /home and the state stay. Ctrl-C now stops it."
+  read -r -p "Enter to install: " _
+fi
+
 # ---- the disk ------------------------------------------------------------------------
-if [ -z "$mode" ]; then
+if [ "$mode" != migrate ] && [ -z "$mode" ]; then
   echo "  1) replace: wipe a disk"
   echo "  2) dual:    keep Windows, install into free space next to it"
   ask choice "Install mode" 1
   case "$choice" in 2|dual) mode=dual ;; *) mode=replace ;; esac
 fi
 stage=""
-if stage="$(readlink -f /dev/disk/by-label/IKIGAI 2>/dev/null)" && [ -b "$stage" ] && [ "$(lsblk -no TYPE "$stage")" = part ]; then
+if [ "$mode" = migrate ]; then
+  :
+elif stage="$(readlink -f /dev/disk/by-label/IKIGAI 2>/dev/null)" && [ -b "$stage" ] && [ "$(lsblk -no TYPE "$stage")" = part ]; then
   disk="/dev/$(lsblk -no pkname "$stage")"
   say "Booted from the staging partition $stage; the disk is $disk"
 else
@@ -53,6 +80,7 @@ if [ "$mode" = replace ]; then
 fi
 
 # ---- who -----------------------------------------------------------------------------
+if [ "$mode" != migrate ]; then
 ask hostname "Hostname" ikigai
 ask username "Username" ""
 [[ $username =~ ^[a-z_][a-z0-9_-]*$ ]] || die "username must be lowercase letters, digits, - and _"
@@ -80,10 +108,55 @@ for vendor in /sys/class/drm/card[0-9]/device/vendor; do
 done
 say "gpu: $gpu  mode: $mode  disk: $disk  host: $hostname  user: $username  tz: $timezone"
 read -r -p "Install? [y/N] " go; [ "$go" = y ] || [ "$go" = Y ] || die "stopped"
+fi
 
 # ---- partitions ----------------------------------------------------------------------
-umount -R /mnt 2>/dev/null || true
-if [ "$mode" = replace ]; then
+if [ "$mode" = migrate ]; then
+  # Empty the root of Arch, keep what is the user's and the box's. /boot is the ESP or the
+  # XBOOTLDR partition: Arch's kernels, initramfs and loader entries go, Windows' files stay.
+  say "Removing Arch from $root_part"
+  rm -f /mnt/ikigai-migrate.json
+  keep_top="home root opt srv var etc nix lost+found"
+  keep_var="lib"
+  keep_var_lib="docker ikigai AccountsService bluetooth NetworkManager"
+  keep_etc="NetworkManager machine-id ssh"
+  for e in /mnt/* /mnt/.[!.]*; do
+    [ -e "$e" ] || continue
+    case " $keep_top " in *" $(basename "$e") "*) ;; *) rm -rf --one-file-system "$e" ;; esac
+  done
+  for e in /mnt/var/* /mnt/var/.[!.]*; do
+    [ -e "$e" ] || continue
+    case " $keep_var " in *" $(basename "$e") "*) ;; *) rm -rf --one-file-system "$e" ;; esac
+  done
+  for e in /mnt/var/lib/* /mnt/var/lib/.[!.]*; do
+    [ -e "$e" ] || continue
+    case " $keep_var_lib " in *" $(basename "$e") "*) ;; *) rm -rf --one-file-system "$e" ;; esac
+  done
+  for e in /mnt/etc/* /mnt/etc/.[!.]*; do
+    [ -e "$e" ] || continue
+    case " $keep_etc " in *" $(basename "$e") "*) ;; *) rm -rf --one-file-system "$e" ;; esac
+  done
+  # Only the host keys of /etc/ssh; NixOS writes the rest.
+  find /mnt/etc/ssh -mindepth 1 -maxdepth 1 -not -name 'ssh_host_*' -exec rm -rf {} +
+  mount --mkdir -o umask=077 "$boot_part" /mnt/boot
+  for e in /mnt/boot/* /mnt/boot/.[!.]*; do
+    [ -e "$e" ] || continue
+    case "$(basename "$e")" in
+      EFI) for f in /mnt/boot/EFI/*; do [ -e "$f" ] || continue; case "$(basename "$f")" in Microsoft|microsoft) ;; *) rm -rf "$f" ;; esac; done ;;
+      *) rm -rf "$e" ;;
+    esac
+  done
+  if [ -n "$efi_part" ]; then
+    mount --mkdir -o umask=077 "$efi_part" /mnt/efi
+    rm -rf /mnt/efi/loader /mnt/efi/EFI/systemd /mnt/efi/EFI/BOOT /mnt/efi/EFI/Linux
+    efi_mount=/efi
+  else
+    efi_mount=/boot
+  fi
+  # Arch gave the user a private group; NixOS puts normal users in `users`.
+  chown -R "$uid:users" "/mnt/home/$username" 2>/dev/null || true
+elif [ "$mode" = replace ]; then
+  umount -R /mnt 2>/dev/null || true
   say "Partitioning $disk: 1 GiB ESP, root on the rest"
   sgdisk --zap-all "$disk" >/dev/null
   sgdisk -n 1:0:+1GiB -t 1:ef00 -c 1:BOOT -n 2:0:0 -t 2:8300 -c 2:nixos "$disk" >/dev/null
@@ -95,6 +168,7 @@ if [ "$mode" = replace ]; then
   mount --mkdir -o umask=077 "$boot_part" /mnt/boot
   efi_mount=/boot
 else
+  umount -R /mnt 2>/dev/null || true
   # Keep Windows: drop the staging partition, then a 1 GiB /boot (XBOOTLDR, the kernels)
   # and the root in the largest free region. Windows' own ESP becomes /efi for the loader.
   if [ -n "$stage" ]; then
@@ -141,8 +215,17 @@ sed -i \
   -e "s|time.timeZone = \"UTC\";|time.timeZone = \"$timezone\";|" \
   -e "s|console.keyMap = \"us\";|console.keyMap = \"$keymap\";|" \
   "$cfg/hosts/$hostname/default.nix"
-if [ "$mode" = dual ]; then
+if [ "$efi_mount" = /efi ]; then
   sed -i "s|boot.loader.efi.canTouchEfiVariables = true;|boot.loader.efi.canTouchEfiVariables = true;\n  boot.loader.efi.efiSysMountPoint = \"/efi\";\n  boot.loader.systemd-boot.xbootldrMountPoint = \"/boot\";|" "$cfg/hosts/$hostname/default.nix"
+fi
+if [ "$mode" = migrate ]; then
+  sed -i \
+    -e "s|steam.enable = false;|steam.enable = ${steam:-false};|" \
+    -e "s|i18n.defaultLocale = \"en_US.UTF-8\";|i18n.defaultLocale = \"${locale:-en_US.UTF-8}\";|" \
+    "$cfg/hosts/$hostname/default.nix"
+  [ -n "$country" ] && sed -i "s|    steam.enable = |    wifiCountry = \"$country\";\n    steam.enable = |" "$cfg/hosts/$hostname/default.nix"
+  # The same uid as on Arch, so the home directory stays theirs.
+  sed -i "s|    description = \"$username\";|    description = \"$username\";\n    uid = $uid;|" "$cfg/users/$username.nix"
 fi
 sed -i \
   -e "s|users.users.lycanthropy|users.users.$username|" \

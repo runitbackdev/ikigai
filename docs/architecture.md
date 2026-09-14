@@ -127,3 +127,14 @@ answers substituted in, writes `hardware.nix` from `nixos-generate-config`, star
 repository there and runs `nixos-install` from it. From `boot.ps1` the mode and the disk
 come from the kernel command line. Afterwards `/etc/nixos` is the user's and
 `ikigai-update` rebuilds from it.
+
+The same live system is a kexec image (`nix/kexec.nix`, a kernel and an initrd that
+carries the whole system). `bin/ikigai-migrate`, run with sudo on an Arch Ikigai, gathers
+the box's facts (user, uid, password hash, hostname, timezone, keyboard, locale, GPU, git
+identity, the root and boot partitions) into `/ikigai-migrate.json`, fetches the image from
+the `iso` release and kexecs into it. The installer, in `ikigai.mode=migrate`, mounts that
+root, removes everything of Arch from it while keeping `/home`, `/root`, `/opt`, `/srv`,
+Docker, Bluetooth, NetworkManager, `/var/lib/ikigai`, the avatars, the machine id and the
+ssh host keys, empties `/boot` of Arch's kernels and entries (Windows' files stay), writes
+the flake from the facts with the same uid, and runs `nixos-install` into the same
+filesystem. Nothing leaves the disk and nothing is backed up.

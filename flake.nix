@@ -19,7 +19,7 @@
   # crate and the shell plugins, so an install downloads them instead of compiling.
   nixConfig = {
     extra-substituters = [ "https://ikigai-desktop.cachix.org" ];
-    extra-trusted-public-keys = [ "ikigai-desktop.cachix.org-1:REPLACE_WITH_THE_KEY_FROM_APP_CACHIX_ORG" ];
+    extra-trusted-public-keys = [ "ikigai-desktop.cachix.org-1:U+xIEO/ryk/+zJxA6nYXJTFdaT7uIu2VY3DkqhLX2B4=" ];
   };
 
   outputs =
@@ -84,6 +84,8 @@
         };
         # The installer ISO (nix/iso.nix): boots to the Ikigai installer on tty1.
         iso = self.nixosConfigurations.iso.config.system.build.isoImage;
+        # The same installer as a kexec image (nix/kexec.nix), for ikigai-migrate.
+        kexec = self.nixosConfigurations.kexec.config.system.build.kexecTree;
         # The example host as a QEMU VM: `nix run .#vm` boots it to the greeter.
         vm = self.nixosConfigurations.example.config.system.build.vm;
       };
@@ -102,6 +104,14 @@
           specialArgs = { inherit self; };
           modules = [
             ./nix/iso.nix
+            { nixpkgs.overlays = [ self.overlays.default ]; }
+          ];
+        };
+        kexec = nixpkgs.lib.nixosSystem {
+          inherit system;
+          specialArgs = { inherit self; };
+          modules = [
+            ./nix/kexec.nix
             { nixpkgs.overlays = [ self.overlays.default ]; }
           ];
         };

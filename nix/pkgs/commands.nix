@@ -26,10 +26,6 @@
   wl-clipboard,
   xdg-user-dirs,
   gpu-screen-recorder,
-  networkmanager,
-  docker,
-  gnutar,
-  gzip,
   nix,
   nixos-rebuild-ng,
   ikigai-shell,
@@ -109,21 +105,6 @@ in
       gawk
       gnused
       fzf
-    ];
-  };
-  ikigai-migrate = mkCommand "ikigai-migrate" {
-    runtimeInputs = [
-      coreutils
-      util-linux
-      gnugrep
-      gnused
-      gawk
-      gnutar
-      gzip
-      jq
-      networkmanager
-      docker
-      systemd
     ];
   };
   ikigai-shell = mkCommand "ikigai-shell" {
