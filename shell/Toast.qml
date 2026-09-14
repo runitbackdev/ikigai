@@ -4,9 +4,10 @@ import QtQuick
 import QtQuick.Effects
 
 // One row of the toast sheet: icon, app, summary, body, image, actions. Clicking invokes
-// the app's default action or dismisses; middle-click always dismisses. The timer pauses
-// under the pointer and never runs for critical urgency. Leaves by fading, then tells the
-// server, so the app hears expired or dismissed only once the row is gone.
+// the app's default action or dismisses; middle-click, the corner X, or a swipe to the
+// right always dismisses. The timer pauses under the pointer and never runs for critical
+// urgency. Leaves by fading, then tells the server, so the app hears expired or dismissed
+// only once the row is gone.
 //
 // The image hint is a portrait or a picture: a chat app sends the sender's avatar, a
 // screenshot tool sends the capture. A wide one is a banner under the text; anything
@@ -31,6 +32,7 @@ Item {
                 return n.actions[i];
         return null;
     }
+    readonly property int closeSize: Math.round(20 * Config.scale)
     property bool leaving: false
 
     width: Math.round(340 * Config.scale)
@@ -49,6 +51,12 @@ Item {
         exit.restart();
     }
 
+    // The sheet keeps sliding the way it was thrown while the row fades.
+    function swipeOut() {
+        sheet.x = toast.width;
+        close(true);
+    }
+
     Timer {
         id: exit
         property bool dismissed: false
@@ -62,173 +70,235 @@ Item {
         onTriggered: toast.close(false)
     }
 
-    StateLayer {
-        radius: 0
-        hovered: hover.hovered
-    }
-
-    Rectangle {
-        width: parent.width - 2 * toast.pad
-        height: 1
-        x: toast.pad
-        color: Theme.colors.outlineVariant
-        visible: toast.index > 0
-    }
-
     HoverHandler {
         id: hover
     }
 
-    MouseArea {
-        anchors.fill: parent
+    TapHandler {
         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-        onClicked: event => {
-            if (event.button === Qt.LeftButton && toast.defaultAction)
+        onTapped: (point, button) => {
+            if (button === Qt.LeftButton && toast.defaultAction)
                 toast.defaultAction.invoke();
             else
                 toast.close(true);
         }
     }
 
-    Column {
-        id: column
-        x: toast.pad
-        y: toast.pad
-        width: parent.width - 2 * toast.pad
-        spacing: Math.round(8 * Config.scale)
+    // Swipe: the sheet follows the pointer rightward, toward the screen edge it hangs
+    // from. Let go past a third of the width, or flung, and it goes; else it springs back.
+    DragHandler {
+        id: drag
+        target: sheet
+        xAxis.minimum: 0
+        yAxis.enabled: false
+        onActiveChanged: {
+            if (active || toast.leaving)
+                return;
+            if (sheet.x > toast.width / 3 || centroid.velocity.x > 800)
+                toast.swipeOut();
+            else
+                sheet.x = 0;
+        }
+    }
 
-        Row {
-            width: parent.width
-            spacing: Math.round(10 * Config.scale)
+    Item {
+        id: sheet
+        width: parent.width
+        height: parent.height
 
-            Item {
-                width: toast.slotSize
-                height: toast.slotSize
+        Behavior on x {
+            enabled: !drag.active
+            Anim { fast: true }
+        }
 
-                AppIcon {
-                    source: Notifs.icon(toast.n)
-                    size: toast.iconSize
-                    visible: !toast.portrait
-                }
+        StateLayer {
+            radius: 0
+            hovered: hover.hovered
+        }
 
-                Rectangle {
-                    id: mask
-                    anchors.fill: parent
-                    radius: Theme.radius
-                    visible: false
-                    layer.enabled: true
-                }
+        Rectangle {
+            width: parent.width - 2 * toast.pad
+            height: 1
+            x: toast.pad
+            color: Theme.colors.outlineVariant
+            visible: toast.index > 0
+        }
 
-                MultiEffect {
-                    anchors.fill: parent
-                    source: picture
-                    maskEnabled: true
-                    maskSource: mask
-                    visible: toast.portrait
-                }
+        // Dismiss, in the corner, there while the pointer is over the row.
+        Item {
+            x: parent.width - toast.pad - toast.closeSize + 4
+            y: toast.pad - 4
+            width: toast.closeSize
+            height: toast.closeSize
+            opacity: hover.hovered ? 1 : 0
 
-                // Whose avatar this is: the app, in the corner.
-                AppIcon {
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    anchors.margins: -2
-                    source: Notifs.icon(toast.n)
-                    size: Math.round(18 * Config.scale)
-                    visible: toast.portrait
-                }
+            Behavior on opacity {
+                Anim { effects: true; fast: true }
             }
 
-            Column {
-                width: parent.width - toast.slotSize - parent.spacing
-                spacing: 2
+            StateLayer {
+                radius: width / 2
+                hovered: closeHover.hovered
+                pressed: closeTap.pressed
+            }
 
-                Text {
-                    width: parent.width
-                    text: toast.n.appName
-                    visible: text !== ""
-                    color: toast.critical ? Theme.colors.error : Theme.colors.fgVariant
-                    font.family: Theme.fontFamily
-                    font.pointSize: Theme.fontSize - 3
-                    elide: Text.ElideRight
-                }
+            Glyph {
+                anchors.centerIn: parent
+                name: "x"
+                size: Math.round(14 * Config.scale)
+                color: Theme.colors.fgVariant
+            }
 
-                Text {
-                    width: parent.width
-                    text: toast.n.summary
-                    color: Theme.colors.fg
-                    font.family: Theme.fontFamily
-                    font.pointSize: Theme.fontSize
-                    font.weight: Font.Medium
-                    wrapMode: Text.Wrap
-                    maximumLineCount: 2
-                    elide: Text.ElideRight
-                }
+            HoverHandler {
+                id: closeHover
+            }
 
-                Text {
-                    width: parent.width
-                    text: toast.n.body
-                    visible: text !== ""
-                    color: Theme.colors.fgVariant
-                    font.family: Theme.fontFamily
-                    font.pointSize: Theme.fontSize - 1
-                    textFormat: Text.StyledText
-                    wrapMode: Text.Wrap
-                    maximumLineCount: 4
-                    elide: Text.ElideRight
-                }
+            TapHandler {
+                id: closeTap
+                onTapped: toast.close(true)
             }
         }
 
-        // Loaded once, shown as banner or portrait by shape. Hidden and square when a
-        // portrait, so the Column skips it and the icon slot's MultiEffect draws it there.
-        Image {
-            id: picture
-            width: toast.banner ? parent.width : toast.portraitSize
-            height: toast.banner ? Math.round(120 * Config.scale) : toast.portraitSize
-            source: toast.n.image
-            visible: toast.banner
-            sourceSize: Qt.size(512, 512)
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-        }
-
-        Row {
+        Column {
+            id: column
+            x: toast.pad
+            y: toast.pad
+            width: parent.width - 2 * toast.pad
             spacing: Math.round(8 * Config.scale)
-            visible: toast.n.actions.length > (toast.defaultAction ? 1 : 0)
 
-            Repeater {
-                model: toast.n.actions
+            Row {
+                width: parent.width
+                spacing: Math.round(10 * Config.scale)
 
-                Rectangle {
-                    required property var modelData
+                Item {
+                    width: toast.slotSize
+                    height: toast.slotSize
 
-                    width: label.width + 24
-                    height: Math.round(28 * Config.scale)
-                    radius: height / 2
-                    color: Theme.colors.surfaceContainerHigh
-                    visible: modelData.identifier !== "default"
+                    AppIcon {
+                        source: Notifs.icon(toast.n)
+                        size: toast.iconSize
+                        visible: !toast.portrait
+                    }
+
+                    Rectangle {
+                        id: mask
+                        anchors.fill: parent
+                        radius: Theme.radius
+                        visible: false
+                        layer.enabled: true
+                    }
+
+                    MultiEffect {
+                        anchors.fill: parent
+                        source: picture
+                        maskEnabled: true
+                        maskSource: mask
+                        visible: toast.portrait
+                    }
+
+                    // Whose avatar this is: the app, in the corner.
+                    AppIcon {
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        anchors.margins: -2
+                        source: Notifs.icon(toast.n)
+                        size: Math.round(18 * Config.scale)
+                        visible: toast.portrait
+                    }
+                }
+
+                Column {
+                    width: parent.width - toast.slotSize - parent.spacing
+                    spacing: 2
 
                     Text {
-                        id: label
-                        anchors.centerIn: parent
-                        text: modelData.text
-                        color: Theme.colors.primary
+                        width: parent.width - toast.closeSize
+                        text: toast.n.appName
+                        visible: text !== ""
+                        color: toast.critical ? Theme.colors.error : Theme.colors.fgVariant
+                        font.family: Theme.fontFamily
+                        font.pointSize: Theme.fontSize - 3
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        width: parent.width
+                        text: toast.n.summary
+                        color: Theme.colors.fg
+                        font.family: Theme.fontFamily
+                        font.pointSize: Theme.fontSize
+                        font.weight: Font.Medium
+                        wrapMode: Text.Wrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                    }
+
+                    Text {
+                        width: parent.width
+                        text: toast.n.body
+                        visible: text !== ""
+                        color: Theme.colors.fgVariant
                         font.family: Theme.fontFamily
                         font.pointSize: Theme.fontSize - 1
+                        textFormat: Text.StyledText
+                        wrapMode: Text.Wrap
+                        maximumLineCount: 4
+                        elide: Text.ElideRight
                     }
+                }
+            }
 
-                    StateLayer {
-                        radius: parent.radius
-                        hovered: actionHover.hovered
-                    }
+            // Loaded once, shown as banner or portrait by shape. Hidden and square when a
+            // portrait, so the Column skips it and the icon slot's MultiEffect draws it there.
+            Image {
+                id: picture
+                width: toast.banner ? parent.width : toast.portraitSize
+                height: toast.banner ? Math.round(120 * Config.scale) : toast.portraitSize
+                source: toast.n.image
+                visible: toast.banner
+                sourceSize: Qt.size(512, 512)
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+            }
 
-                    HoverHandler {
-                        id: actionHover
-                    }
+            Row {
+                spacing: Math.round(8 * Config.scale)
+                visible: toast.n.actions.length > (toast.defaultAction ? 1 : 0)
 
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: modelData.invoke()
+                Repeater {
+                    model: toast.n.actions
+
+                    Rectangle {
+                        required property var modelData
+
+                        width: label.width + 24
+                        height: Math.round(28 * Config.scale)
+                        radius: height / 2
+                        color: Theme.colors.surfaceContainerHigh
+                        visible: modelData.identifier !== "default"
+
+                        Text {
+                            id: label
+                            anchors.centerIn: parent
+                            text: modelData.text
+                            color: Theme.colors.primary
+                            font.family: Theme.fontFamily
+                            font.pointSize: Theme.fontSize - 1
+                        }
+
+                        StateLayer {
+                            radius: parent.radius
+                            hovered: actionHover.hovered
+                        }
+
+                        HoverHandler {
+                            id: actionHover
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: modelData.invoke()
+                        }
                     }
                 }
             }

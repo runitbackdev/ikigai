@@ -27,7 +27,9 @@ Pinned and running apps at the top, the status items and clock at the bottom.
 ## Notifications
 
 Toasts out of the frame's top border on the primary screen. App timeout or 5 s, none for
-critical, paused under the pointer. Click runs the default action, middle-click dismisses.
+critical, paused under the pointer. Click runs the default action; middle-click, the X in
+the corner, or a swipe to the right dismisses. A square image (an avatar) sits in the icon
+slot, a wide one is a banner.
 
 The sidebar (click the clock, `ikigai-shell sidebar toggle`): history, calendar, the bell
 is do-not-disturb, the broom clears. The clock carries the unread count.
