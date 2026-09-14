@@ -91,6 +91,10 @@ in
       XCURSOR_THEME = "Ikigai";
       XCURSOR_SIZE = "24";
     };
+    # icon-theme.cache in every theme, as pacman's hook left on Arch: Qt's icon loader
+    # answers a miss from it instead of walking the hundred directories of Cosmic and
+    # hicolor, which cost the shell tens of milliseconds per icon it could not find.
+    gtk.iconCache.enable = true;
     security.polkit.enable = true;
     security.rtkit.enable = true;
     services.accounts-daemon.enable = true;
