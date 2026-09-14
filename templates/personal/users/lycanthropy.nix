@@ -16,18 +16,16 @@
         userEmail = "you@example.com";
       };
 
-      # PARA: Projects, Areas, Resources, Archive. The XDG folders the file manager, the
-      # file picker and the screenshot tool use point into it; the four are made at switch.
+      # PARA, numbered: 0 Areas, 1 Projects, 2 Resources, 3 Archive. Documents and the
+      # file manager's projects entry point into it; Pictures, Videos, Music and Downloads
+      # stay where they are (Pictures/Screenshots is where the shell puts screenshots).
+      # The four are made at switch; nothing inside them is ever touched.
       xdg.userDirs = {
-        documents = "${config.home.homeDirectory}/Resources";
-        pictures = "${config.home.homeDirectory}/Resources/Pictures";
-        videos = "${config.home.homeDirectory}/Resources/Videos";
-        music = "${config.home.homeDirectory}/Resources/Music";
-        download = "${config.home.homeDirectory}/Downloads";
-        extraConfig.XDG_PROJECTS_DIR = "${config.home.homeDirectory}/Projects";
+        documents = "${config.home.homeDirectory}/PARA/2";
+        extraConfig.XDG_PROJECTS_DIR = "${config.home.homeDirectory}/PARA/1";
       };
       home.activation.para = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        run mkdir -p ~/Projects ~/Areas ~/Resources ~/Archive
+        run mkdir -p ~/PARA/0 ~/PARA/1 ~/PARA/2 ~/PARA/3
       '';
 
       home.packages = with pkgs; [
