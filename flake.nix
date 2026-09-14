@@ -110,6 +110,7 @@
       apps.${system}.vm = {
         type = "app";
         program = "${self.packages.${system}.vm}/bin/run-ikigai-example-vm";
+        meta.description = "The example host as a QEMU VM";
       };
 
       checks.${system} = {
@@ -128,6 +129,6 @@
           ;
       };
 
-      formatter.${system} = pkgs.nixfmt-rfc-style;
+      formatter.${system} = pkgs.nixfmt;
     };
 }
