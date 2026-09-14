@@ -33,15 +33,20 @@ user="${SUDO_USER:-}"
 [ -n "$user" ] && [ "$user" != root ] || user=$(getent passwd 1000 | cut -d: -f1)
 [ -n "$user" ] || die "cannot tell which user is yours (run with sudo from your account)"
 uid=$(id -u "$user")
+host=$(cat /etc/hostname 2>/dev/null || uname -n); host=${host%%.*}
+[ -n "$host" ] || die "no hostname in /etc/hostname"
 hash=$(getent shadow "$user" | cut -d: -f2)
 [[ $hash == \$* ]] || die "$user has no password hash in /etc/shadow"
 
 root_uuid=$(findmnt -no UUID /) || die "no UUID for /"
 root_fs=$(findmnt -no FSTYPE /)
 [ "$root_fs" = ext4 ] || [ "$root_fs" = xfs ] || [ "$root_fs" = btrfs ] || die "root is $root_fs; expected ext4, xfs or btrfs"
-boot_uuid=$(findmnt -no UUID /boot 2>/dev/null || true)
+# Without an fstab line systemd automounts the ESP on first access: touch the directories so
+# the partition is there, and --real skips the autofs trigger stacked under it.
+ls -A /boot /efi >/dev/null 2>&1 || true
+boot_uuid=$(findmnt --real -no UUID /boot 2>/dev/null || true)
 [ -n "$boot_uuid" ] || die "/boot is not a mounted partition; the installer needs the ESP (or XBOOTLDR) there"
-efi_uuid=$(findmnt -no UUID /efi 2>/dev/null || true)
+efi_uuid=$(findmnt --real -no UUID /efi 2>/dev/null || true)
 
 tz=$(readlink -f /etc/localtime 2>/dev/null || true); tz=${tz#/usr/share/zoneinfo/}
 keymap=$(sed -n 's/^KEYMAP=//p' /etc/vconsole.conf 2>/dev/null | tr -d '"' | head -1)
@@ -63,7 +68,7 @@ steam=false; pacman -Q steam >/dev/null 2>&1 && steam=true
 # flake: each is a line in nixpkgs or a leftover in $HOME, never carried over as files.
 packages=$(pacman -Qqe 2>/dev/null | jq -R . | jq -sc .)
 
-facts=$(jq -n --arg host "$(hostname)" --arg user "$user" --argjson uid "$uid" --arg hash "$hash" \
+facts=$(jq -n --arg host "$host" --arg user "$user" --argjson uid "$uid" --arg hash "$hash" \
   --arg tz "${tz:-UTC}" --arg keymap "${keymap:-us}" --arg locale "${locale:-en_US.UTF-8}" --arg country "$country" \
   --arg gpu "$gpu" --argjson steam "$steam" --arg gitname "${gitname:-$user}" --arg gitemail "$gitemail" \
   --arg root "$root_uuid" --arg boot "$boot_uuid" --arg efi "$efi_uuid" --argjson packages "${packages:-[]}" \
@@ -80,8 +85,8 @@ echo "  else on / and every kernel and entry on /boot go. Nothing is backed up: 
 echo "  is not in that list, copy it now."
 echo
 [ "$dry" = 1 ] && { say "dry run: stopping here"; exit 0; }
-read -r -p "Type the hostname ($(hostname)) to continue: " confirm
-[ "$confirm" = "$(hostname)" ] || die "not confirmed"
+read -r -p "Type the hostname ($host) to continue: " confirm
+[ "$confirm" = "$host" ] || die "not confirmed"
 
 command -v kexec >/dev/null || { say "installing kexec-tools"; pacman -S --needed --noconfirm kexec-tools; }
 work=/var/tmp/ikigai-kexec
