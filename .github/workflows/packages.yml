@@ -41,7 +41,7 @@ jobs:
           cd repo
           gh release view packages >/dev/null 2>&1 || gh release create packages --title "Ikigai packages" \
             --notes "A pacman repository, rebuilt by CI from packages/*/PKGBUILD. Not for humans: install/packages.sh adds it to pacman.conf as [ikigai]."
-          gh release download packages -p '*.pkg.tar.zst' --skip-existing
+          gh release download packages -p '*.pkg.tar.zst' --skip-existing || echo "no earlier packages in the release"
           repo-add -R ikigai.db.tar.gz ./*.pkg.tar.zst
           cp ikigai.db.tar.gz ikigai.db && cp ikigai.files.tar.gz ikigai.files
           gh release upload packages --clobber ./*.pkg.tar.zst ikigai.db ikigai.db.tar.gz ikigai.files ikigai.files.tar.gz
