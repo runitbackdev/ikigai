@@ -65,18 +65,18 @@ write, so a logout's mass close never empties the file. `ikigai-session` clears 
 `XDG_RUNTIME_DIR` at start; the shell sets it as restore begins, so a shell restart
 mid-session does not replay.
 
-## The Qt patch
+## The compositor
 
-cosmic-comp drops a client that commits to a surface after destroying its layer-shell
-role. Qt's Wayland plugin does that on hide, so every Qt layer-shell client died the first
-time it hid a window. `packages/qt6-base` carries a patch that unmaps first;
-`install/qt.sh` rebuilds `libQt6WaylandClient.so` and a pacman hook rebuilds it after
-every qt6-base upgrade. Details and the ext-session-lock exception:
-`packages/qt6-base/README.md`. Upstream: cosmic-comp#1590, smithay#1979.
+cosmic-comp is Ikigai's fork (`cosmic-comp-ikigai` from the `[ikigai]` pacman repo,
+`packages/cosmic-comp`), Arch's package plus the fixes in [upstream.md](upstream.md). The
+first of them is why: stock cosmic-comp drops a client that commits to a surface after
+destroying its layer-shell or lock role, and Qt does that on every hide, so every Qt
+layer-shell client died the first time it hid a window. Until 2026-09-14 Ikigai rebuilt
+Qt's Wayland client around it; the fork fixes it in Smithay and Qt is stock again.
 
 ## Installer
 
-`install.sh` runs ten steps: preflight, packages, qt, configs, tools, theme, services,
+`install.sh` runs nine steps: preflight, packages, configs, tools, theme, services,
 firewall, session, greeter. A step list with a spinner and the last log line on a
 terminal, plain `==> [n/10]` lines without one or with `IKIGAI_PLAIN=1`. Everything a step
 printed is in `~/.local/state/ikigai/install.log`; a failed step shows its last 20 lines.

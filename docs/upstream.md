@@ -13,18 +13,18 @@ xdg-desktop-portal-cosmic and cosmic-settings-daemon (smithay e3d461a, cosmic-pr
 Qt's Wayland plugin hides a layer-shell window by destroying the role and then committing
 a null buffer. Smithay's commit hook stays on the surface after the role goes and cosmic-comp
 answers the commit with a protocol error, so every Qt layer-shell client died the first
-time it hid a window. Ikigai carries a patched `libQt6WaylandClient.so`
-(`packages/qt6-base`, rebuilt by a pacman hook on every qt6-base upgrade); Vicinae turns
-layer-shell off on any desktop named COSMIC because of the same bug, so its unit gets
-`XDG_CURRENT_DESKTOP=Ikigai`. Upstream: cosmic-comp#1590 and smithay#1979, both open with
-no movement since 2026-03.
+time it hid a window. Until 2026-09-14 Ikigai carried a patched `libQt6WaylandClient.so`,
+rebuilt by a pacman hook on every qt6-base upgrade. Vicinae turns layer-shell off on any
+desktop named COSMIC because of the same bug, so its unit gets `XDG_CURRENT_DESKTOP=Ikigai`;
+that stays, since Vicinae keys on the name, not on the bug. Upstream: cosmic-comp#1590 and
+smithay#1979, both open with no movement since 2026-03.
 
 Fixed on the fork, 2026-09-13: Smithay `dc10f06c` returns early from the `wlr_layer` and
 `session_lock` pre-commit hooks once the role object is dead, the check Drakulix named as
 acceptable in smithay#1979; cosmic-comp `fee768c8` pins it. `just comp-test` is the proof:
 stock Qt survives six hide/show cycles and two lock cycles under the fork and dies on the
-first of each under stock. Not sent upstream yet. Once the fork is on every box the Qt
-rebuild machinery and the Vicinae drop-in go.
+first of each under stock. Not sent upstream yet. The Qt rebuild is gone with it;
+`install/packages.sh` restores stock qt6-base on a box that still has it.
 
 ### `set_focus` ignores exclusive layer surfaces for one frame
 

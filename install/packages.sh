@@ -2,7 +2,7 @@
 set -euo pipefail
 
 PACMAN=(
-  base-devel git rust rust-src quickshell qt6-shadertools cmake ninja ccache vulkan-headers
+  base-devel git rust rust-src quickshell qt6-shadertools cmake ninja
   cosmic-comp-ikigai cosmic-bg cosmic-settings cosmic-settings-daemon cosmic-idle cosmic-randr
   cosmic-icon-theme cosmic-sound-theme cosmic-files xdg-desktop-portal-cosmic greetd xorg-xwayland
   ghostty zsh zsh-autosuggestions zsh-syntax-highlighting zsh-completions starship
@@ -47,6 +47,16 @@ fi
 [ "$(pacman -Qq cosmic-comp 2>/dev/null)" = cosmic-comp ] && sudo pacman -Rdd --noconfirm cosmic-comp
 
 sudo pacman -Syu --needed --noconfirm "${PACMAN[@]}"
+
+# Until 2026-09-14 Ikigai rebuilt Qt's Wayland client around the layer-shell bug the forked
+# compositor fixes. A box still carrying that rebuild goes back to stock: the pacman hook and
+# its state go, and reinstalling qt6-base puts Arch's library back.
+if [ -e /etc/pacman.d/hooks/ikigai-qt-wayland.hook ] || [ -e /var/lib/ikigai/qt-wayland ]; then
+  sudo rm -rf /etc/pacman.d/hooks/ikigai-qt-wayland.hook /usr/local/lib/ikigai/ikigai-qt-wayland \
+    /usr/local/share/ikigai/qt6-base /var/lib/ikigai/qt-wayland /var/cache/ikigai/qt
+  sudo pacman -S --noconfirm qt6-base
+  echo "stock Qt Wayland client restored; log out so the shell runs on the forked compositor"
+fi
 
 # Build on disk, not /tmp: tmpfs is RAM-limited and a Rust build needs GBs.
 BUILD_ROOT="${XDG_CACHE_HOME:-$HOME/.cache}/ikigai/build"

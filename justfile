@@ -78,7 +78,6 @@ update:
     grep -qE '^(config|icons)/' <<<"$changed" && steps="$steps configs"
     grep -qE '^(themes|cursors)/' <<<"$changed" && steps="$steps theme"
     grep -qE '^greeter/' <<<"$changed" && steps="$steps greeter"
-    grep -qE '^packages/qt6-base/' <<<"$changed" && steps="$steps qt"
     grep -qE '^packages/[^/]+/PKGBUILD' <<<"$changed" && steps="$steps packages"
     grep -qE '^firewall/' <<<"$changed" && steps="$steps firewall"
     steps=$(tr ' ' '\n' <<<"$steps" | grep . | sort -u | tr '\n' ' ')
@@ -111,10 +110,10 @@ check:
     #!/usr/bin/env bash
     set -euo pipefail
     cd "{{tree}}"
-    for f in boot.sh install.sh install/*.sh bin/* scripts/*.sh packages/qt6-base/ikigai-qt-wayland; do bash -n "$f"; done
+    for f in boot.sh install.sh install/*.sh bin/* scripts/*.sh; do bash -n "$f"; done
     echo "syntax ok"
     if command -v shellcheck >/dev/null; then
-      shellcheck -S warning boot.sh install.sh install/*.sh bin/* scripts/*.sh packages/qt6-base/ikigai-qt-wayland && echo "shellcheck ok"
+      shellcheck -S warning boot.sh install.sh install/*.sh bin/* scripts/*.sh && echo "shellcheck ok"
     else echo "shellcheck not installed (pacman -S shellcheck); CI runs it"; fi
     (cd session && cargo clippy --locked -q --all-targets -- -D warnings && cargo test --locked -q) && echo "session crate ok"
     find themes config -type f \( -name '*.ron' -o -path '*/v[0-9]/*' \) | while read -r f; do grep -q . "$f" || { echo "empty config file: $f"; exit 1; }; done
@@ -125,7 +124,7 @@ check:
 comp-test comp="cosmic-comp":
     scripts/comp-test.sh {{comp}}
 
-# The full CI check in an archlinux container (needs docker): package names, the Qt patch, everything
+# The full CI check in an archlinux container (needs docker): package names, everything
 ci:
     docker run --rm -v "{{tree}}:/src:ro" -w /src archlinux:latest bash scripts/ci-check.sh
 

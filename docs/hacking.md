@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | `boot.sh`, `boot.ps1`, `windows/live.sh`, `archinstall.json` | the entry points |
-| `install.sh`, `install/` | the installer and its ten steps |
+| `install.sh`, `install/` | the installer and its nine steps |
 | `bin/` | `ikigai-*` commands and the `zed` wrapper, onto `/usr/local/bin` |
 | `config/` | seeds for `~/.config`, COSMIC system config, `system/etc` |
 | `shell/` | the Quickshell shell, greeter and lock included. `plugin/blobs` is vendored |
@@ -14,7 +14,6 @@
 | `themes/` | `<name>/palette.json` and what `theme-build.py` renders from it |
 | `cursors/bibata` | Bibata's SVG sources, vendored |
 | `icons/` | the Ikigai icon theme and its Phosphor name map |
-| `packages/qt6-base` | the Wayland patch, its rebuild script and pacman hook |
 | `packages/cosmic-comp` | the PKGBUILD for the forked compositor; CI builds it into the `packages` release |
 | `firewall/` | the first-boot unit |
 | `tools/cosmic-theme-gen` | dev-only: builds the COSMIC theme from `builder.ron` |
