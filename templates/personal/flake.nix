@@ -1,5 +1,5 @@
 {
-  description = "My Ikigai box";
+  description = "An Ikigai box";
 
   inputs = {
     ikigai.url = "github:runitbackdev/ikigai";
@@ -14,7 +14,7 @@
         modules = [
           ikigai.nixosModules.ikigai
           ./hosts/ikigai
-          ./users/lycanthropy.nix
+          ./users/alice.nix
         ];
       };
     };

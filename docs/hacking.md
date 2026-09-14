@@ -10,7 +10,7 @@
 | `nix/pkgs/` | the overlay and the packages: the compositor fork, the shell, the session crate, the theme, the commands |
 | `nix/iso.nix`, `nix/kexec.nix`, `nix/installer/` | the installer ISO, the same as a kexec image, `ikigai-install` and the live system they share |
 | `hosts/example` | the host CI builds and `just vm` boots |
-| `templates/personal` | the personal flake the installer writes to `/etc/nixos` |
+| `templates/personal` | the example personal flake, for `nix flake init` on a NixOS box; the installer writes its own from the answers |
 | `bin/` | the `ikigai-*` commands, packaged by `nix/pkgs/commands.nix`; `ikigai-migrate` runs on the Arch side and is not |
 | `config/` | the app configs the home module installs, COSMIC's system config, `mimeapps.list` |
 | `shell/` | the Quickshell shell, greeter and lock included. `plugin/blobs` is vendored |

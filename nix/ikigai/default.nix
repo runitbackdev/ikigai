@@ -29,7 +29,7 @@ in
 
     user = lib.mkOption {
       type = lib.types.str;
-      example = "lycanthropy";
+      example = "alice";
       description = ''
         The box's user. Created as a normal user in wheel, networkmanager, docker and video,
         with zsh as their shell and the Ikigai home module applied. Password, name and

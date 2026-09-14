@@ -122,11 +122,15 @@ The ISO (`nix/iso.nix`) is NixOS's minimal image with `ikigai-install`
 (`nix/installer/ikigai-install`) on tty1 and a copy of the flake it was built from at
 `/etc/ikigai`. The installer asks for the mode (replace, or dual next to Windows), the
 disk, a hostname, a user and password, a timezone, a keyboard layout and a git identity;
-detects the GPU; partitions; copies `templates/personal` to `/mnt/etc/nixos` with the
-answers substituted in, writes `hardware.nix` from `nixos-generate-config`, starts a git
-repository there and runs `nixos-install` from it. From `boot.ps1` the mode and the disk
-come from the kernel command line. Afterwards `/etc/nixos` is the user's and
-`ikigai-update` rebuilds from it.
+detects the GPU; partitions; writes the personal flake to `/mnt/etc/nixos` from the
+answers, the way `nixos-generate-config` writes `configuration.nix` (`templates/personal`
+is the same shape, for a NixOS box that already exists), writes `hardware.nix` from
+`nixos-generate-config`, starts a git
+repository there and runs `nixos-install` from it. The password never enters the flake:
+after the install it is set inside the new system with `chpasswd`, into `/etc/shadow`,
+where `passwd` changes it later, so the flake can be pushed anywhere. From `boot.ps1`
+the mode and the disk come from the kernel command line. Afterwards `/etc/nixos` is the
+user's and `ikigai-update` rebuilds from it.
 
 The same live system is a kexec image (`nix/kexec.nix`, a kernel and an initrd that
 carries the whole system). `bin/ikigai-migrate`, run with sudo on an Arch Ikigai, gathers
