@@ -22,7 +22,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $Label = 'IKIGAI'
-$StageGB = 3
+$StageGB = 4
 $Description = 'Ikigai installer'
 $Release = 'https://github.com/runitbackdev/ikigai/releases/download/iso'
 

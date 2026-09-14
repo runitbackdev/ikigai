@@ -56,9 +56,10 @@ cd /etc/nixos
 sudo nix flake init -t github:runitbackdev/ikigai#personal
 ```
 
-Edit `hosts/ikigai/default.nix` (user, GPU, hostname, timezone), put
-`nixos-generate-config --show-hardware-config` in `hardware.nix`, then
-`sudo nixos-rebuild switch --flake /etc/nixos`.
+Edit `hosts/ikigai/default.nix` (user, GPU, hostname, timezone), rename
+`users/alice.nix` to yours, put `nixos-generate-config --show-hardware-config` in
+`hardware.nix`, then `sudo nixos-rebuild switch --flake /etc/nixos`. Passwords are
+never in the flake: `passwd` sets them.
 
 Settings live in that flake: `ikigai.user`, `ikigai.gpu`, `ikigai.theme`,
 `ikigai.steam.enable`, `ikigai.nvidia.pin580`, `ikigai.wifiCountry`. Edit, then

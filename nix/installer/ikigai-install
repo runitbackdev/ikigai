@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # The Ikigai installer, run by the ISO or the kexec image on tty1 (nix/installer/live.nix).
 # Asks for the disk, a user, a password, a hostname and a timezone, writes a personal flake
-# (templates/personal) to /etc/nixos of the new system and runs nixos-install from it. From
+# from the answers to /etc/nixos of the new system and runs nixos-install from it. From
 # boot.ps1 and ikigai-migrate the mode comes from the kernel command line; from a stick it asks.
 #   ikigai.mode=replace   wipe the disk: an ESP and a root
 #   ikigai.mode=dual      keep Windows: /boot and a root in the largest free region,
@@ -23,7 +23,6 @@ choice="" disk="" hostname="" username="" timezone="" keymap="" gitname="" gitem
 [ -d /sys/firmware/efi ] || die "this machine booted in legacy BIOS mode; Ikigai needs UEFI"
 mode="$(param ikigai.mode)"
 ref="$(param ikigai.ref)"; ref="${ref:-main}"
-template=/etc/ikigai/templates/personal
 
 echo
 echo "  ikigai install"
@@ -196,37 +195,129 @@ else
 fi
 
 # ---- the flake -----------------------------------------------------------------------
+# Written from the answers, the way nixos-generate-config writes configuration.nix: the
+# personal flake, one host, one user. No password in it: that is set inside the new system
+# below and lives in /etc/shadow, so this directory can be pushed anywhere.
 say "Writing the flake to /mnt/etc/nixos"
 cfg=/mnt/etc/nixos
-mkdir -p "$cfg"
-cp -r "$template/." "$cfg/"
-chmod -R u+w "$cfg"
-if [ "$hostname" != ikigai ]; then mv "$cfg/hosts/ikigai" "$cfg/hosts/$hostname"; fi
-if [ "$username" != lycanthropy ]; then mv "$cfg/users/lycanthropy.nix" "$cfg/users/$username.nix"; fi
-sed -i \
-  -e "s|github:runitbackdev/ikigai\"|github:runitbackdev/ikigai/$ref\"|" \
-  -e "s|nixosConfigurations.ikigai|nixosConfigurations.$hostname|" \
-  -e "s|./hosts/ikigai|./hosts/$hostname|" \
-  -e "s|./users/lycanthropy.nix|./users/$username.nix|" \
-  "$cfg/flake.nix"
-sed -i \
-  -e "s|user = \"lycanthropy\";|user = \"$username\";|" \
-  -e "s|gpu = \"nvidia\";|gpu = \"$gpu\";|" \
-  -e "s|networking.hostName = \"ikigai\";|networking.hostName = \"$hostname\";|" \
-  -e "s|time.timeZone = \"UTC\";|time.timeZone = \"$timezone\";|" \
-  -e "s|console.keyMap = \"us\";|console.keyMap = \"$keymap\";|" \
-  "$cfg/hosts/$hostname/default.nix"
-if [ "$efi_mount" = /efi ]; then
-  sed -i "s|boot.loader.efi.canTouchEfiVariables = true;|boot.loader.efi.canTouchEfiVariables = true;\n  boot.loader.efi.efiSysMountPoint = \"/efi\";\n  boot.loader.systemd-boot.xbootldrMountPoint = \"/boot\";|" "$cfg/hosts/$hostname/default.nix"
-fi
+mkdir -p "$cfg/hosts/$hostname" "$cfg/users"
+release=$(nixos-version 2>/dev/null | sed -n 's/^\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p'); release=${release:-25.11}
+
+cat > "$cfg/flake.nix" <<EOF
+{
+  description = "$hostname, an Ikigai box";
+
+  inputs = {
+    ikigai.url = "github:runitbackdev/ikigai/$ref";
+    nixpkgs.follows = "ikigai/nixpkgs";
+  };
+
+  outputs =
+    { self, ikigai, nixpkgs }:
+    {
+      nixosConfigurations.$hostname = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        modules = [
+          ikigai.nixosModules.ikigai
+          ./hosts/$hostname
+          ./users/$username.nix
+        ];
+      };
+    };
+}
+EOF
+
+{
+  cat <<EOF
+# This box. What ikigai-install asked for is here; everything else is Ikigai's default and
+# has an option (github:runitbackdev/ikigai, nix/ikigai/default.nix). Rebuild with
+# \`ikigai-update\`, or \`sudo nixos-rebuild switch --flake /etc/nixos\`.
+{ ... }:
+{
+  imports = [ ./hardware.nix ];
+
+  ikigai = {
+    enable = true;
+    user = "$username";
+    gpu = "$gpu";
+EOF
+  [ -n "$country" ] && echo "    wifiCountry = \"$country\";"
+  cat <<EOF
+    steam.enable = ${steam:-false};
+  };
+
+  networking.hostName = "$hostname";
+  time.timeZone = "$timezone";
+  i18n.defaultLocale = "${locale:-en_US.UTF-8}";
+  console.keyMap = "$keymap";
+
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+EOF
+  if [ "$efi_mount" = /efi ]; then
+    echo '  # Windows'"'"' ESP holds the loader; the kernels live on their own /boot (XBOOTLDR).'
+    echo '  boot.loader.efi.efiSysMountPoint = "/efi";'
+    echo '  boot.loader.systemd-boot.xbootldrMountPoint = "/boot";'
+  fi
+  cat <<EOF
+
+  # The NixOS release this box was first installed with. Never change it.
+  system.stateVersion = "$release";
+}
+EOF
+} > "$cfg/hosts/$hostname/default.nix"
+
+{
+  cat <<EOF
+# $username. The Ikigai home module already holds every app config; this is what is only
+# true here: who you are to git, how your home is laid out, what else you want installed.
+# Your password is not here: \`passwd\` changes it, /etc/shadow keeps it.
+{ pkgs, ... }:
+{
+  users.users.$username = {
+    description = "$username";
+EOF
+  [ "$mode" = migrate ] && echo "    # The uid from the Arch box, so the home directory stays yours." && echo "    uid = $uid;"
+  cat <<EOF
+  };
+
+  home-manager.users.$username =
+    { config, lib, ... }:
+    {
+EOF
+  if [ -n "$gitname" ] || [ -n "$gitemail" ]; then
+    cat <<EOF
+      programs.git = {
+        userName = "$gitname";
+        userEmail = "$gitemail";
+      };
+
+EOF
+  fi
+  cat <<'EOF'
+      # A home layout, for instance PARA numbered 0 Areas, 1 Projects, 2 Resources, 3 Archive:
+      # Documents and the file manager's projects entry point into it, the folders are made
+      # at switch, nothing inside them is ever touched.
+      # xdg.userDirs = {
+      #   documents = "${config.home.homeDirectory}/PARA/2";
+      #   extraConfig.XDG_PROJECTS_DIR = "${config.home.homeDirectory}/PARA/1";
+      # };
+      # home.activation.para = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      #   run mkdir -p ~/PARA/0 ~/PARA/1 ~/PARA/2 ~/PARA/3
+      # '';
+
+      # Anything else: search.nixos.org has the names.
+      home.packages = with pkgs; [
+EOF
+  [ "$mode" = migrate ] && echo "        # arch-packages.txt lists what pacman had; codex, for one, is in nixpkgs"
+  cat <<'EOF'
+      ];
+    };
+}
+EOF
+} > "$cfg/users/$username.nix"
+
 if [ "$mode" = migrate ]; then
-  sed -i \
-    -e "s|steam.enable = false;|steam.enable = ${steam:-false};|" \
-    -e "s|i18n.defaultLocale = \"en_US.UTF-8\";|i18n.defaultLocale = \"${locale:-en_US.UTF-8}\";|" \
-    "$cfg/hosts/$hostname/default.nix"
-  [ -n "$country" ] && sed -i "s|    steam.enable = |    wifiCountry = \"$country\";\n    steam.enable = |" "$cfg/hosts/$hostname/default.nix"
-  # The same uid as on Arch, so the home directory stays theirs.
-  sed -i "s|    description = \"$username\";|    description = \"$username\";\n    uid = $uid;|" "$cfg/users/$username.nix"
   # What pacman had installed on request: a checklist, since each is a line in nixpkgs now
   # (search.nixos.org) or already in $HOME (npm, cargo, pipx, uv, ~/.local/bin survive).
   {
@@ -236,16 +327,7 @@ if [ "$mode" = migrate ]; then
     echo "# Tools installed into your home (npm -g, cargo, pipx, uv, ~/.local/bin) are still there."
     jq -r '.packages[]' <<<"$facts"
   } > "$cfg/arch-packages.txt"
-  sed -i "s|        # localsend|        # localsend\n        # arch-packages.txt lists what pacman had; codex, for one, is in nixpkgs|" "$cfg/users/$username.nix"
 fi
-sed -i \
-  -e "s|users.users.lycanthropy|users.users.$username|" \
-  -e "s|home-manager.users.lycanthropy|home-manager.users.$username|" \
-  -e "s|description = \"lycanthropy\";|description = \"$username\";|" \
-  -e "s|initialPassword = \"ikigai\";|hashedPassword = \"$hashed\";|" \
-  -e "s|userName = \"lycanthropy\";|userName = \"$gitname\";|" \
-  -e "s|userEmail = \"you@example.com\";|userEmail = \"$gitemail\";|" \
-  "$cfg/users/$username.nix"
 {
   echo "# Written by nixos-generate-config at install: the disks, the kernel modules the hardware"
   echo "# needs, the CPU's microcode. Regenerate with nixos-generate-config --show-hardware-config."
@@ -256,6 +338,10 @@ git -C "$cfg" init -q && git -C "$cfg" add -A && git -C "$cfg" -c user.name=ikig
 # ---- install -------------------------------------------------------------------------
 say "nixos-install: the compositor, the shell and the dev stack from the cache, then the boot loader on $efi_mount"
 nixos-install --root /mnt --flake "$cfg#$hostname" --no-root-passwd --no-channel-copy
+# The password, into the new system's /etc/shadow, never into the flake. Root stays locked;
+# sudo is the wheel group's.
+say "Setting $username's password"
+nixos-enter --root /mnt -c "printf '%s:%s\n' '$username' '$hashed' | chpasswd -e"
 uid=$(grep "^$username:" /mnt/etc/passwd | cut -d: -f3 || echo 1000)
 chown -R "${uid:-1000}:users" "$cfg"
 
