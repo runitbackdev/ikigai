@@ -5,9 +5,9 @@
 
 pkgname=cosmic-comp-ikigai
 pkgver=1.8.0
-pkgrel=1
+pkgrel=2
 epoch=1
-_commit=fee768c8d7a66a9c7af3d581cc410843f9c83deb
+_commit=913c6e05d8113dc6d83243932cc285eb11a9ad15
 pkgdesc='Compositor for the COSMIC desktop environment, with Ikigai patches'
 arch=(x86_64)
 url='https://github.com/runitbackdev/cosmic-comp'

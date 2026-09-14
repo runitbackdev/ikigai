@@ -40,6 +40,16 @@ and could see the same blink.
 Fix: run `focus_target_is_valid` in `set_focus`, keep the focus-stack append so the window
 is next when the overlay closes. A few lines.
 
+### In kiosk mode the child's exit goes unnoticed until something else wakes the loop
+
+`cosmic-comp <command>` checks `try_wait` on the child at the end of every event-loop
+iteration (`src/lib.rs` 225) and nothing else. With no clients left and no input, the loop
+sleeps and the compositor outlives its command indefinitely; a stray connection to its
+socket is enough to make it exit. Showed up in `just comp-test`, whose lock test ends with
+the client's clean exit and nothing after it. Fixed on the fork 2026-09-14: a
+`calloop::signals` source for SIGCHLD that does nothing but wake the loop, registered only
+when a command was given. A dozen lines plus calloop's `signals` feature. Not sent upstream.
+
 ### No move or resize in cosmic-toplevel-management
 
 The protocol activates, minimizes, maximizes and moves windows between workspaces, and that
