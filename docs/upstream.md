@@ -100,12 +100,23 @@ a config key upstream.
 
 ### Middle-click autoscroll with pan cursors
 
-Windows-style autoscroll everywhere. Per-app today: Zen through policy, the Chromium apps
-through a blink flag. GTK, Qt and COSMIC apps have nothing. Only the compositor can do it
+Windows-style autoscroll everywhere. Was per-app: Zen through policy, the Chromium apps
+through a blink flag; GTK, Qt and COSMIC apps had nothing. Only the compositor can do it
 everywhere with the cursor, since it owns pointer position, cursor image and the frame
-clock: pin the pointer on middle press, emit axis events on Chromium's curve
-(`0.000008 * d^2.2` px/ms past a 15 px dead zone), show the pan cursors. Largest item
-here; a feature, not a fix.
+clock.
+
+On the fork since 2026-09-14, off by default (`middle_click_autoscroll` in
+cosmic-comp-config; Ikigai's system config turns it on): a middle press over a window
+becomes an `AutoscrollGrab` (`src/shell/grabs/autoscroll.rs`) that holds the press back.
+Released inside the dead zone the press and release are delivered together, an ordinary
+click. Past the dead zone a timer emits continuous axis events to the surface under the
+press every 8 ms at Chromium's `0.000008 * d^2.2` px/ms per axis, the pointer moves freely
+with the client keeping focus as under an implicit grab, and the cursor is one of nine pan
+shapes loaded by name (`pan-all`, `pan-n`, `pan-ne`, ...) with the resize arrows and
+`all-scroll` as fallbacks (`CursorShape` in `backend/render/cursor.rs`). Windows with an
+active pointer constraint, app ids in `exclude`, and presses with Super held are passed
+through. Ikigai draws the pan cursors (`cursors/ikigai`). Not sent upstream yet; a
+feature, not a fix, and the config key would want a Settings page.
 
 ### Not yet diagnosed
 

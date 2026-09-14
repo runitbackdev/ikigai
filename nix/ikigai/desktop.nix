@@ -122,17 +122,13 @@ in
       profiles.cosmic.databases = [ { settings = dconfSettings; } ];
     };
 
-    # Middle-click autoscroll in Zen: Firefox's, off by default on Linux; a policy turns it
-    # on as a default the user can still flip. Zen reads /etc/zen/policies instead of its
-    # package's, so the trust-store policy the flake's package ships is repeated here.
+    # Zen reads /etc/zen/policies instead of its package's, so the trust-store policy the
+    # flake's package ships is repeated here. Firefox's own middle-click autoscroll stays
+    # off: the compositor does it, and a middle click that reaches Zen must stay a click.
     environment.etc."zen/policies/policies.json".text = builtins.toJSON {
       policies = {
         DisableAppUpdate = true;
         DefaultSerialGuardSetting = 3;
-        Preferences."general.autoScroll" = {
-          Value = true;
-          Status = "default";
-        };
         SecurityDevices."System Trust" = "${pkgs.p11-kit}/lib/pkcs11/p11-kit-trust.so";
       };
     };

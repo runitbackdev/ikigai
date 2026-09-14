@@ -105,9 +105,16 @@ user; `ikigai-shell welcome open` brings it back.
 
 ## Middle-click autoscroll
 
-Per app, the way Windows does it. Zen through `/etc/zen/policies/policies.json`, Discord
-and YouTube Music through `--enable-blink-features=MiddleClickAutoscroll` on their desktop
-entries in `/run/current-system/sw/share/applications`. GTK, Qt and COSMIC apps have none.
+Everywhere, the way Windows does it, by the compositor fork. Hold the middle button and
+move: past 15 px the window under the press scrolls, faster the further the pointer is
+from the press, on Chromium's curve, until the button is released. The cursor is the
+origin ring, then an arrow the way you are heading. A middle press released inside the
+15 px is delivered as an ordinary click, so paste, close-tab and open-in-new-tab still
+work; a press that scrolled is never seen by the app. Apps that need the middle button
+for a drag (Blender) go in the `exclude` list of
+`/run/current-system/sw/share/cosmic/com.system76.CosmicComp/v1/middle_click_autoscroll`,
+by app id; a copy under `~/.config/cosmic` overrides it, `enabled: false` turns it off.
+Zen's and Chromium's own autoscroll are left off, since a middle click must stay a click.
 
 ## Settings
 

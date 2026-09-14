@@ -8,8 +8,8 @@ cosmic-comp.overrideAttrs (finalAttrs: old: {
   version = "1.8.0-ikigai";
   src = fetchgit {
     url = "https://github.com/runitbackdev/cosmic-comp";
-    rev = "913c6e05d8113dc6d83243932cc285eb11a9ad15";
-    hash = "sha256-PUl6NmdnLWZ27CI2qk5uLU+Uu5QImzmPJeO2RrlnBKE=";
+    rev = "38d09e511f84beb48fa07d0915b5ac52190aab2f";
+    hash = "sha256-71LVm67rkyyPsw28Qo81YiNjf5rcyXYyb2pUX8zJ3KE=";
   };
   cargoDeps = rustPlatform.fetchCargoVendor {
     inherit (finalAttrs) src;

@@ -1,0 +1,58 @@
+# Ikigai's own cursors, same format as bibata/hotspots.toml (256-unit canvas).
+# The pan cursors are what cosmic-comp's middle-click autoscroll shows.
+
+[cursors]
+
+[cursors."pan-all"]
+png = 'pan-all.png'
+x11_name = 'pan-all'
+x_hotspot = 128
+y_hotspot = 128
+
+[cursors."pan-n"]
+png = 'pan-n.png'
+x11_name = 'pan-n'
+x_hotspot = 128
+y_hotspot = 128
+
+[cursors."pan-ne"]
+png = 'pan-ne.png'
+x11_name = 'pan-ne'
+x_hotspot = 128
+y_hotspot = 128
+
+[cursors."pan-e"]
+png = 'pan-e.png'
+x11_name = 'pan-e'
+x_hotspot = 128
+y_hotspot = 128
+
+[cursors."pan-se"]
+png = 'pan-se.png'
+x11_name = 'pan-se'
+x_hotspot = 128
+y_hotspot = 128
+
+[cursors."pan-s"]
+png = 'pan-s.png'
+x11_name = 'pan-s'
+x_hotspot = 128
+y_hotspot = 128
+
+[cursors."pan-sw"]
+png = 'pan-sw.png'
+x11_name = 'pan-sw'
+x_hotspot = 128
+y_hotspot = 128
+
+[cursors."pan-w"]
+png = 'pan-w.png'
+x11_name = 'pan-w'
+x_hotspot = 128
+y_hotspot = 128
+
+[cursors."pan-nw"]
+png = 'pan-nw.png'
+x11_name = 'pan-nw'
+x_hotspot = 128
+y_hotspot = 128

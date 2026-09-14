@@ -184,6 +184,7 @@ def gtk_css(palette):
 # the KDE/libXcursor SVG format cosmic-comp renders itself). ikigai-theme-set rasterises the
 # same SVGs into Xcursor files for the toolkits that only read those.
 CURSOR_SRC = Path(__file__).resolve().parent.parent / "cursors" / "bibata"
+CURSOR_OWN = CURSOR_SRC.parent / "ikigai"  # Ikigai's own shapes, drawn in Bibata's idiom
 CURSOR_CANVAS = 256  # Bibata draws on a 256-unit canvas; hotspots.toml is in those units
 CURSOR_DELAY = 40    # ms per animation frame, upstream's x11_delay
 
@@ -218,17 +219,20 @@ def cursors(palette, out):
     recolour = lambda svg: pattern.sub(lambda m: colours[m.group(0).upper()], svg)
     table = tomllib.loads((CURSOR_SRC / "hotspots.toml").read_text())["cursors"]
     defaults = table.pop("fallback_settings")
+    entries = [(CURSOR_SRC, e) for e in table.values()]
+    own = tomllib.loads((CURSOR_OWN / "hotspots.toml").read_text())["cursors"]
+    entries += [(CURSOR_OWN, e) for e in own.values()]
     if out.exists():
         shutil.rmtree(out)
     scalable = out / "cursors_scalable"
     aliases = []
-    for entry in table.values():
+    for src, entry in entries:
         name = entry["x11_name"]
         stem = entry["png"].removesuffix(".png")
         if stem.endswith("-*"):  # animated: a directory of frames
-            frames = sorted((CURSOR_SRC / "svg" / stem[:-2]).glob("*.svg"))
+            frames = sorted((src / "svg" / stem[:-2]).glob("*.svg"))
         else:
-            frames = [CURSOR_SRC / "svg" / f"{stem}.svg"]
+            frames = [src / "svg" / f"{stem}.svg"]
         meta = []
         for frame in frames:
             (scalable / name).mkdir(parents=True, exist_ok=True)
@@ -246,7 +250,7 @@ def cursors(palette, out):
     (out / "cursor.theme").write_text(
         f"[Icon Theme]\nName={out.name}\nComment=Bibata Modern in the {palette['name']} palette\n")
     shutil.copy(CURSOR_SRC / "LICENSE", out / "LICENSE")
-    return len(table), len(aliases)
+    return len(entries), len(aliases)
 
 
 OUTPUTS = {

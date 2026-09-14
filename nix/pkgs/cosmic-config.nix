@@ -20,11 +20,11 @@ lib.hiPrio (
     sed '/^OnlyShowIn=/d' ${cosmic-settings}/share/applications/com.system76.CosmicSettings.desktop \
       > $out/share/applications/com.system76.CosmicSettings.desktop
 
-    # Discord and YouTube Music are Chromium, whose middle-click autoscroll is behind a blink
-    # flag, and which picks its password store from the desktop's name and knows no COSMIC:
-    # name the keyring outright or tokens land in a plaintext store.
+    # Discord and YouTube Music are Chromium, which picks its password store from the
+    # desktop's name and knows no COSMIC: name the keyring outright or tokens land in a
+    # plaintext store. (Middle-click autoscroll is the compositor's now, not a blink flag.)
     for entry in ${discord}/share/applications/discord.desktop ${pear-desktop}/share/applications/*.desktop; do
-      sed 's|^Exec=\([^ ]*\)|Exec=\1 --enable-blink-features=MiddleClickAutoscroll --password-store=gnome-libsecret|' \
+      sed 's|^Exec=\([^ ]*\)|Exec=\1 --password-store=gnome-libsecret|' \
         "$entry" > "$out/share/applications/$(basename "$entry")"
     done
 

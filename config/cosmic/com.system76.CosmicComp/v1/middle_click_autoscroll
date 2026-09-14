@@ -1,0 +1,7 @@
+(
+    enabled: true,
+    dead_zone: 15.0,
+    multiplier: 0.000008,
+    exponent: 2.2,
+    exclude: [],
+)

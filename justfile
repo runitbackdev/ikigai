@@ -111,3 +111,7 @@ check:
 # The layer-shell regression test: stock Qt hide/show and lock/unlock under a nested cosmic-comp (`just comp-test path/to/cosmic-comp`)
 comp-test comp="cosmic-comp":
     scripts/comp-test.sh {{comp}}
+
+# A client under a build of the fork, nested, with this tree's config and cursors (`just comp-try path/to/cosmic-comp ghostty`)
+comp-try comp="cosmic-comp" *args:
+    scripts/comp-try.sh {{comp}} {{args}}

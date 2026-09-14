@@ -1,0 +1,5 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path fill-rule="evenodd" d="M128 76a52 52 0 1 0 0.001 0zM128 104a24 24 0 1 1-0.001 0z" fill="#100e0d" stroke="#eee3e0" stroke-width="17" stroke-linejoin="round"/>
+<circle cx="128" cy="128" r="13" fill="#100e0d" stroke="#eee3e0" stroke-width="17" stroke-linejoin="round"/>
+<path d="M128 16L156 52H100Z" fill="#100e0d" stroke="#eee3e0" stroke-width="17" stroke-linejoin="round" transform="rotate(135 128 128)"/>
+</svg>
