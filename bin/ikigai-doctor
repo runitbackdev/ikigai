@@ -67,6 +67,7 @@ for b in "$IKIGAI_PATH"/bin/*; do
   fi
 done
 comp=$(pacman -Q cosmic-comp-ikigai 2>/dev/null | cut -d' ' -f2)
+# shellcheck disable=SC1091,SC2154 # epoch, pkgver, pkgrel come from the sourced PKGBUILD
 want=$(. "$IKIGAI_PATH/packages/cosmic-comp/PKGBUILD" 2>/dev/null && echo "$epoch:$pkgver-$pkgrel")
 if [ -z "$comp" ]; then fail comp "stock cosmic-comp $(pacman -Q cosmic-comp 2>/dev/null | cut -d' ' -f2); the fork is not installed (just install packages)"
 elif [ "$comp" = "$want" ]; then ok comp "cosmic-comp-ikigai $comp"
