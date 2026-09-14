@@ -9,8 +9,14 @@
 let
   cfg = config.ikigai;
   qmlImportPath = "${pkgs.ikigai-shell-plugins}/lib/qt6/qml";
+  # NixOS gives every service a PATH of five packages, which would hide the system profile
+  # from a unit that runs commands by name (the shell's nmcli and app launches, Vicinae's
+  # desktop entries); no path leaves the user manager's, which `ikigai-session` fills from
+  # the compositor's environment.
+  managerPath = lib.mkForce [ ];
   unit = description: exec: {
     inherit description;
+    path = managerPath;
     partOf = [ "ikigai-session.target" ];
     after = [ "graphical-session-pre.target" ];
     serviceConfig = {
@@ -64,6 +70,7 @@ in
       # installed; a Wants= from ikigai-session.target would form an ordering cycle.
       vicinae = {
         description = "Vicinae launcher";
+        path = managerPath;
         wantedBy = [ "graphical-session.target" ];
         partOf = [ "graphical-session.target" ];
         after = [ "graphical-session.target" ];
