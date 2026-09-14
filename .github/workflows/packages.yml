@@ -32,6 +32,7 @@ jobs:
             (cd "$d" && sudo -u builder makepkg -s --noconfirm --needed)
           done
           mkdir -p repo && mv packages/*/*.pkg.tar.zst repo/
+          rm -f repo/*-debug-*.pkg.tar.zst
           ls -la repo
       - name: Publish
         env:
@@ -42,6 +43,8 @@ jobs:
           gh release view packages >/dev/null 2>&1 || gh release create packages --title "Ikigai packages" \
             --notes "A pacman repository, rebuilt by CI from packages/*/PKGBUILD. Not for humans: install/packages.sh adds it to pacman.conf as [ikigai]."
           gh release download packages -p '*.pkg.tar.zst' --skip-existing || echo "no earlier packages in the release"
+          # A release asset name cannot hold the ':' of an epoch; the database must say the name GitHub serves.
+          for f in *:*.pkg.tar.zst; do [ -e "$f" ] && mv -f "$f" "${f//:/.}"; done
           repo-add -R ikigai.db.tar.gz ./*.pkg.tar.zst
           cp ikigai.db.tar.gz ikigai.db && cp ikigai.files.tar.gz ikigai.files
           gh release upload packages --clobber ./*.pkg.tar.zst ikigai.db ikigai.db.tar.gz ikigai.files ikigai.files.tar.gz
