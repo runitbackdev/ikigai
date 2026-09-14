@@ -8,14 +8,13 @@
 }:
 let
   cfg = config.ikigai;
-  # The two-letter country of the timezone, from tzdata's zone.tab: "US" for America/New_York.
+  # The two-letter country of the timezone: "US" for America/New_York. zone.tab is tzdata's
+  # table cut to country and zone, kept in the tree so evaluation needs no build.
   countryOfTimeZone =
     tz:
     let
-      rows = lib.filter (l: l != "" && !lib.hasPrefix "#" l) (
-        lib.splitString "\n" (builtins.readFile "${pkgs.tzdata}/share/zoneinfo/zone.tab")
-      );
-      hit = lib.findFirst (l: builtins.elemAt (lib.splitString "\t" l) 2 == tz) null rows;
+      rows = lib.filter (l: l != "") (lib.splitString "\n" (builtins.readFile ./zone.tab));
+      hit = lib.findFirst (l: builtins.elemAt (lib.splitString "\t" l) 1 == tz) null rows;
     in
     if hit == null then null else builtins.head (lib.splitString "\t" hit);
   country =

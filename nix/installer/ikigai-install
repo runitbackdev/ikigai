@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # The Ikigai installer, run by the ISO or the kexec image on tty1 (nix/installer/live.nix).
 # Asks for the disk, a user, a password, a hostname and a timezone, writes a personal flake
 # (templates/personal) to /etc/nixos of the new system and runs nixos-install from it. From
