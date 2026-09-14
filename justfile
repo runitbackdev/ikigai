@@ -80,7 +80,8 @@ update:
     grep -qE '^greeter/' <<<"$changed" && steps="$steps greeter"
     grep -qE '^packages/[^/]+/PKGBUILD' <<<"$changed" && steps="$steps packages"
     grep -qE '^firewall/' <<<"$changed" && steps="$steps firewall"
-    steps=$(tr ' ' '\n' <<<"$steps" | grep . | sort -u | tr '\n' ' ')
+    # A step deleted since the installed commit shows up in the diff too; only run what exists.
+    steps=$(for s in $steps; do [ -f "{{tree}}/install/$s.sh" ] && echo "$s"; done | sort -u | tr '\n' ' ')
     echo "installed ${installed:0:7} -> ${head:0:7}; steps: $steps"
     for s in $steps; do echo "==> $s"; just install "$s"; done
     echo "$head" > "{{state}}/installed_commit"
