@@ -287,9 +287,9 @@ EOF
 EOF
   if [ -n "$gitname" ] || [ -n "$gitemail" ]; then
     cat <<EOF
-      programs.git = {
-        userName = "$gitname";
-        userEmail = "$gitemail";
+      programs.git.settings.user = {
+        name = "$gitname";
+        email = "$gitemail";
       };
 
 EOF

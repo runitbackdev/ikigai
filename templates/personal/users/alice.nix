@@ -11,9 +11,9 @@
   home-manager.users.alice =
     { config, lib, ... }:
     {
-      programs.git = {
-        userName = "alice";
-        userEmail = "alice@example.com";
+      programs.git.settings.user = {
+        name = "alice";
+        email = "alice@example.com";
       };
 
       # A home layout, for instance PARA numbered 0 Areas, 1 Projects, 2 Resources, 3 Archive:
