@@ -112,6 +112,13 @@ check:
 comp-test comp="cosmic-comp":
     scripts/comp-test.sh {{comp}}
 
+# A tray item with a submenu on the rail, for trying the tray menus by hand; Ctrl+C or its Quit removes it
+tray-fixture:
+    #!/usr/bin/env bash
+    # PyGObject is what ikigai-caffeinate's interpreter has; borrow it.
+    py=$(sed -n '1s/^#!//p' "$(dirname "$(readlink -f "$(command -v ikigai-caffeinate)")")/.ikigai-caffeinate-wrapped")
+    exec "$py" scripts/tray-fixture.py
+
 # A client under a build of the fork, nested, with this tree's config and cursors (`just comp-try path/to/cosmic-comp ghostty`)
 comp-try comp="cosmic-comp" *args:
     scripts/comp-try.sh {{comp}} {{args}}

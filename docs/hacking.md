@@ -42,6 +42,7 @@
 | `just doctor` | what is running |
 | `just check` | bash -n, shellcheck, config sanity, `nix flake check` (the crate's tests run inside its build) |
 | `just comp-test [binary]` | the layer-shell regression test for the compositor fork, nested |
+| `just tray-fixture` | a tray item with a submenu on the rail, for trying the tray menus by hand. Its Quit or Ctrl+C removes it |
 | `just comp-try [binary] [command]` | a client under a build of the fork, nested, with this tree's compositor config and cursors. Ghostty by default; libcosmic apps fork at startup and end the kiosk session |
 
 ## The VM
