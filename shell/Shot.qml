@@ -448,7 +448,8 @@ Scope {
                             sourceItem: frozenImage
                             sourceRect: Qt.rect(loupe.at.x - 8, loupe.at.y - 8, 16, 16)
                             smooth: false
-                            live: false
+                            // Sixteen pixels a frame: cheap, and the rect moves with the pointer.
+                            live: true
                         }
 
                         Rectangle {
