@@ -155,12 +155,23 @@ def on_sni_call(conn, sender, path, iface, method, params, invocation):
 loop = GLib.MainLoop()
 
 
+def register(conn, name):
+    try:
+        conn.call_sync("org.kde.StatusNotifierWatcher", "/StatusNotifierWatcher", "org.kde.StatusNotifierWatcher",
+                       "RegisterStatusNotifierItem", GLib.Variant("(s)", (name,)), None, Gio.DBusCallFlags.NONE, -1, None)
+        print(f"registered as {name}; Ctrl-C or Quit removes it", flush=True)
+    except GLib.Error as err:
+        print(f"no watcher yet ({err.message}); waiting for one", flush=True)
+
+
 def on_bus(conn, name):
     conn.register_object("/StatusNotifierItem", Gio.DBusNodeInfo.new_for_xml(SNI_XML).interfaces[0], on_sni_call, on_sni_get, None)
     conn.register_object("/MenuBar", Gio.DBusNodeInfo.new_for_xml(MENU_XML).interfaces[0], on_menu_call, on_menu_get, None)
-    conn.call_sync("org.kde.StatusNotifierWatcher", "/StatusNotifierWatcher", "org.kde.StatusNotifierWatcher",
-                   "RegisterStatusNotifierItem", GLib.Variant("(s)", (name,)), None, Gio.DBusCallFlags.NONE, -1, None)
-    print(f"registered as {name}; Ctrl-C or Quit removes it", flush=True)
+    register(conn, name)
+    # A new watcher (a restarted shell, `just shell`) starts empty: register again, as
+    # every tray app does.
+    Gio.bus_watch_name_on_connection(conn, "org.kde.StatusNotifierWatcher", Gio.BusNameWatcherFlags.NONE,
+                                     lambda c, _n, _owner: register(c, name), None)
 
 
 def main():
