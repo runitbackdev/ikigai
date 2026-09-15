@@ -106,7 +106,7 @@ Log out, power off, reboot and sleep are Vicinae commands: `Super`, type the wor
 
 | | |
 |---|---|
-| `ikigai-update` | pull the personal flake, update its inputs, rebuild and switch, restart the shell. `--no-pull` rebuilds from the inputs as locked, `--check` shows what would change |
+| `ikigai-update` | pull the personal flake, update its inputs, rebuild and switch, restart the shell. `--no-pull` rebuilds from the inputs as locked, `--check` shows what would change, `--available` only says whether anything is newer |
 | `ikigai-doctor` | what is running: the flake, the session units, the greeter, the compositor fork, scheduler, zram, firewall |
 | `ikigai-keys` | every binding. `--fzf` to search |
 | `ikigai-caffeinate` | keep the screen on: until Ctrl-C, `-t 90m`, `-w PID`, or around a command |

@@ -51,6 +51,9 @@ Toasts 1.0 Toasts.qml
 Sidebar 1.0 Sidebar.qml
 Calendar 1.0 Calendar.qml
 singleton Audio 1.0 Audio.qml
+singleton Caffeine 1.0 Caffeine.qml
+CaffeineCard 1.0 CaffeineCard.qml
+singleton Updates 1.0 Updates.qml
 singleton Osd 1.0 Osd.qml
 OsdPill 1.0 OsdPill.qml
 Status 1.0 Status.qml

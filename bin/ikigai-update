@@ -6,18 +6,43 @@
 #   ikigai-update              inputs + rebuild
 #   ikigai-update --no-pull    rebuild from the inputs as locked
 #   ikigai-update --check      show what would change, switch nothing
+#   ikigai-update --available  is there anything to update: exit 0 and what, or 1.
+#                              Fetches and locks into scratch, touches nothing
 set -euo pipefail
 
 FLAKE="${IKIGAI_FLAKE:-@flake@}"
-pull=1 check=0
+pull=1 check=0 available=0
 case "${1:-}" in
   --no-pull) pull=0 ;;
   --check) check=1 ;;
+  --available) available=1 ;;
   "") ;;
   *) sed -n '2,8p' "$0" >&2; exit 2 ;;
 esac
 
 [ -f "$FLAKE/flake.nix" ] || { echo "no flake at $FLAKE (IKIGAI_FLAKE, or ikigai.flake in the config)" >&2; exit 1; }
+
+if [ "$available" = 1 ]; then
+  found=0
+  if [ -d "$FLAKE/.git" ] && git -C "$FLAKE" rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then
+    git -C "$FLAKE" fetch -q 2>/dev/null || true
+    behind=$(git -C "$FLAKE" rev-list --count 'HEAD..@{upstream}' 2>/dev/null || echo 0)
+    if [ "$behind" -gt 0 ]; then
+      echo "$FLAKE: $behind commits behind"
+      found=1
+    fi
+  fi
+  lock=$(mktemp)
+  trap 'rm -f "$lock"' EXIT
+  if nix flake update --flake "$FLAKE" --output-lock-file "$lock" >/dev/null 2>&1; then
+    newer=$(jq -r --slurpfile old "$FLAKE/flake.lock" \
+      '.nodes | to_entries[] | select(.value.locked.rev != null and .value.locked.rev != $old[0].nodes[.key].locked.rev) | .key' "$lock")
+    for input in $newer; do echo "$input: newer"; found=1; done
+  fi
+  [ "$found" = 1 ] && exit 0
+  echo "up to date"
+  exit 1
+fi
 
 if [ "$pull" = 1 ]; then
   if [ -d "$FLAKE/.git" ]; then

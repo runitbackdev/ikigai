@@ -8,6 +8,7 @@ Item {
     default property alias content: slot.data
 
     signal clicked
+    signal rightClicked
 
     implicitWidth: Theme.barWidth - 8
     implicitHeight: Theme.barWidth - 8
@@ -39,6 +40,7 @@ Item {
     MouseArea {
         id: press
         anchors.fill: parent
-        onClicked: button.clicked()
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onClicked: mouse => mouse.button === Qt.RightButton ? button.rightClicked() : button.clicked()
     }
 }

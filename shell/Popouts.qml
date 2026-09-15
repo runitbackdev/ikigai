@@ -13,6 +13,7 @@ Item {
     property Item current: null
     readonly property bool workspacesOpen: current === workspaces
     readonly property bool volumeOpen: current === volume
+    readonly property bool caffeineOpen: current === caffeine
     readonly property bool batteryOpen: current === battery
     readonly property bool networkOpen: current === network
     readonly property bool bluetoothOpen: current === bluetooth
@@ -77,6 +78,13 @@ Item {
             close();
         else
             show(volume, at, null);
+    }
+
+    function toggleCaffeine(at) {
+        if (current === caffeine)
+            close();
+        else
+            show(caffeine, at, null);
     }
 
     function show(content, at, task) {
@@ -169,6 +177,12 @@ Item {
         BluetoothCard {
             id: bluetooth
             shown: popouts.current === bluetooth
+            onDone: popouts.close()
+        }
+
+        CaffeineCard {
+            id: caffeine
+            shown: popouts.current === caffeine
             onDone: popouts.close()
         }
     }

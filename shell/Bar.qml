@@ -261,10 +261,12 @@ PanelWindow {
                 bluetoothOpen: popouts.bluetoothOpen
                 batteryOpen: popouts.batteryOpen
                 volumeOpen: popouts.volumeOpen
+                caffeineOpen: popouts.caffeineOpen
                 onNetworkRequested: at => popouts.toggleNetwork(at)
                 onBluetoothRequested: at => popouts.toggleBluetooth(at)
                 onBatteryRequested: at => popouts.toggleBattery(at)
                 onVolumeRequested: at => popouts.toggleVolume(at)
+                onCaffeineRequested: at => popouts.toggleCaffeine(at)
                 onTrayMenuRequested: (item, at) => popouts.openTray(item, at)
             }
 

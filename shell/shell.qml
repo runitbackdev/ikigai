@@ -39,6 +39,14 @@ ShellRoot {
     }
 
     IpcHandler {
+        target: "caffeine"
+
+        function toggle(): void {
+            Caffeine.toggle();
+        }
+    }
+
+    IpcHandler {
         target: "sidebar"
 
         function toggle(): void {

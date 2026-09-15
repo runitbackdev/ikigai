@@ -17,19 +17,6 @@ Column {
     spacing: 4
 
     BarButton {
-        onClicked: {
-            taskbar.dismissRequested();
-            Quickshell.execDetached(["vicinae", "toggle"]);
-        }
-
-        Glyph {
-            anchors.centerIn: parent
-            name: "squares-four"
-            size: Theme.iconSize
-        }
-    }
-
-    BarButton {
         id: taskViewButton
         checked: taskbar.workspacesOpen
         onClicked: taskbar.workspacesRequested(taskViewButton)

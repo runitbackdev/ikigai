@@ -13,6 +13,8 @@ Singleton {
     readonly property real volume: ready ? sink.audio.volume : 0
     readonly property bool muted: ready ? sink.audio.muted : true
     readonly property bool micMuted: source && source.audio ? source.audio.muted : false
+    // Something is capturing: an app with an input stream open.
+    readonly property bool recording: Pipewire.nodes.values.some(n => n.type === PwNodeType.AudioInStream)
     readonly property var sinks: Pipewire.nodes.values.filter(n => n.isSink && !n.isStream && n.audio !== null)
     readonly property string icon: !ready || muted || volume === 0 ? "speaker-slash" : volume < 0.34 ? "speaker-none" : volume < 0.67 ? "speaker-low" : "speaker-high"
 
@@ -40,6 +42,11 @@ Singleton {
     function toggleMute() {
         if (ready)
             sink.audio.muted = !sink.audio.muted;
+    }
+
+    function toggleMicMute() {
+        if (source && source.audio)
+            source.audio.muted = !source.audio.muted;
     }
 
     onVolumeChanged: Osd.show("volume")
