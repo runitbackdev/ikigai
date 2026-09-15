@@ -110,7 +110,7 @@ Log out, power off, reboot and sleep are Vicinae commands: `Super`, type the wor
 | `ikigai-doctor` | what is running: the flake, the session units, the greeter, the compositor fork, scheduler, zram, firewall |
 | `ikigai-keys` | every binding. `--fzf` to search |
 | `ikigai-caffeinate` | keep the screen on: until Ctrl-C, `-t 90m`, `-w PID`, or around a command |
-| `ikigai-shot` | `region`, `screen` or `record` |
+| `ikigai-shot` | `region`, `screen`, `text` (OCR to the clipboard), `color` (a pixel as hex) or `record` |
 | `ikigai-steam` | Steam, once `ikigai.steam.enable` put it there; pins it to the rail |
 | `ikigai-shell welcome open` | the first-login card again |
 

@@ -26,6 +26,7 @@
   wl-clipboard,
   xdg-user-dirs,
   gpu-screen-recorder,
+  tesseract,
   pipewire,
   nix,
   nixos-rebuild-ng,
@@ -127,6 +128,7 @@ in
       wl-clipboard
       xdg-user-dirs
       gpu-screen-recorder
+      (tesseract.override { enableLanguages = [ "eng" ]; })
     ];
     substitutions = { inherit shell; };
   };

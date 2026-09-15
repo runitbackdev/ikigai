@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Screenshots: `ikigai-shot region` (Print) and `ikigai-shot screen` (Shift+Print), to the
 # clipboard and ~/Pictures/Screenshots; `ikigai-shot record` (Super+Shift+R) starts a
-# recording and stops it. The shell's picker when the Ikigai shell offers one (with
-# satty as its Edit action), else grim, slurp and gpu-screen-recorder directly.
+# recording and stops it; `ikigai-shot text` reads a region with tesseract onto the
+# clipboard; `ikigai-shot color` picks a pixel as hex. The shell's picker when the Ikigai
+# shell offers one (with satty as its Edit action), else grim, slurp and
+# gpu-screen-recorder directly. `ikigai-shot ocr FILE` is the shell's Text action.
 set -euo pipefail
 
 SHELL_QML=@shell@/shell.qml
@@ -18,6 +20,20 @@ color() {
 }
 
 shell_has() { qs ipc -p "$SHELL_QML" show 2>/dev/null | grep -q "^target $1\$"; }
+
+notify() {
+  busctl --user -- call org.freedesktop.Notifications /org/freedesktop/Notifications \
+    org.freedesktop.Notifications Notify 'susssasa{sv}i' Ikigai 0 "" "$1" "$2" 0 0 4000 >/dev/null 2>&1 || true
+}
+
+# Text out of a PNG, to the clipboard, and a toast with the start of it.
+ocr() {
+  local text
+  text=$(tesseract "$1" - --psm 6 2>/dev/null | tr -d '\f' | sed -e 's/[[:space:]]*$//' | sed -e '/^$/N;/^\n$/D')
+  if [ -z "$text" ]; then notify "No text found" ""; return 1; fi
+  printf '%s' "$text" | wl-copy
+  notify "Text copied" "$(printf '%s' "$text" | head -c 160)"
+}
 
 # Clipboard and ~/Pictures/Screenshots, like the shell's picker does.
 keep() {
@@ -41,6 +57,26 @@ case "${1:-region}" in
     fi
     grim - | keep
     ;;
+  text)
+    if shell_has shot; then
+      exec qs ipc -p "$SHELL_QML" call shot text
+    fi
+    geometry=$(slurp -d -w 2 -b "#$(color surface 100e0d)b3" -c "#$(color primary 86adff)ff" -s "#00000000") || exit 0
+    tmp=$(mktemp --suffix=.png); trap 'rm -f "$tmp"' EXIT
+    grim -g "$geometry" "$tmp" && ocr "$tmp"
+    ;;
+  ocr)
+    ocr "${2:?ikigai-shot ocr FILE}"
+    ;;
+  color)
+    if shell_has shot; then
+      exec qs ipc -p "$SHELL_QML" call shot color
+    fi
+    point=$(slurp -p -f '%x,%y' -b "#00000000" -c "#$(color primary 86adff)ff") || exit 0
+    hex=$(grim -g "$point 1x1" -t ppm - | tail -c 3 | od -An -tx1 | tr -d ' \n')
+    printf '#%s' "$hex" | wl-copy
+    notify "Copied #$hex" ""
+    ;;
   record)
     if shell_has shot; then
       exec qs ipc -p "$SHELL_QML" call shot record
@@ -51,7 +87,7 @@ case "${1:-region}" in
     exec gpu-screen-recorder -w region -region "$geometry" -f 60 -a default_output -c mp4 -cursor yes -fallback-cpu-encoding yes -o "$dir/$(date +%Y-%m-%d_%H-%M-%S).mp4"
     ;;
   *)
-    echo "usage: ikigai-shot [region|screen|record]" >&2
+    echo "usage: ikigai-shot [region|screen|text|color|record|ocr FILE]" >&2
     exit 2
     ;;
 esac

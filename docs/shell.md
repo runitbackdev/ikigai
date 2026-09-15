@@ -77,18 +77,22 @@ a click picks a tile, its close button closes the window. Always on the primary 
 
 ## Screenshots
 
-`Print` freezes the screen and opens the picker: Region, Window or Screen, then Snip,
-Edit or Record. `Shift+Print` starts on Screen.
+`Print` freezes the screen and opens the picker: Region, Window, Screen or Color, then
+Snip, Edit, Text or Record. `Shift+Print` starts on Screen. Keys 1 to 4 pick the mode,
+Tab the action.
 
 - Snip: PNG to the clipboard and `~/Pictures/Screenshots`.
 - Edit: the PNG in satty.
+- Text: the selection read by tesseract (English), the text on the clipboard and a toast
+  with the start of it.
+- Color: a loupe over the frozen screen; a click puts the pixel's hex on the clipboard.
 - Record: gpu-screen-recorder with system audio, a dot and timer on the rail.
   `Super+Shift+R` or a click on the dot stops it and puts the path (`~/Videos/Recordings`)
   on the clipboard. x264 on the CPU when the GPU encoder is unavailable; a failure is a
   notification.
 
-`ikigai-shot region|screen|record` from a terminal. Without the shell it falls back to
-grim, slurp and gpu-screen-recorder directly.
+`ikigai-shot region|screen|text|color|record` from a terminal. Without the shell it falls
+back to grim, slurp, tesseract and gpu-screen-recorder directly.
 
 ## Lock and polkit
 

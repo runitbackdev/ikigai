@@ -31,6 +31,8 @@ in
       grim
       slurp
       satty
+      # The picker's Text action; English only, the full set is a gigabyte.
+      (tesseract.override { enableLanguages = [ "eng" ]; })
       gpu-screen-recorder
       mpv
       ghostty

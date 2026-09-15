@@ -7,8 +7,9 @@ import QtQuick
 // captured (cosmic-comp paints the pointer into captures whatever grim asks, so it has
 // to be hidden first), then the frozen capture fades in with a pill to pick what to
 // capture (a region, a screen) and what to do with it (snip: clipboard +
-// ~/Pictures/Screenshots; edit: satty). Freezing keeps the screen from changing under
-// the drag.
+// ~/Pictures/Screenshots; edit: satty; text: tesseract, to the clipboard). Freezing
+// keeps the screen from changing under the drag. Color is a fourth mode: a loupe over
+// the frozen capture, a click puts the pixel's hex on the clipboard.
 Scope {
     id: shot
 
@@ -26,11 +27,13 @@ Scope {
     readonly property var modes: [
         { id: "region", icon: "selection", label: "Region", key: Qt.Key_1 },
         { id: "window", icon: "app-window", label: "Window", key: Qt.Key_2 },
-        { id: "screen", icon: "monitor", label: "Screen", key: Qt.Key_3 }
+        { id: "screen", icon: "monitor", label: "Screen", key: Qt.Key_3 },
+        { id: "color", icon: "eyedropper", label: "Color", key: Qt.Key_4 }
     ]
     readonly property var actions: [
         { id: "snip", icon: "copy", label: "Snip" },
         { id: "edit", icon: "pencil-simple", label: "Edit" },
+        { id: "text", icon: "text-aa", label: "Text" },
         { id: "record", icon: "record", label: "Record" }
     ]
 
@@ -40,6 +43,8 @@ Scope {
         function region(): void { shot.begin("region", "snip"); }
         function window(): void { shot.begin("window", "snip"); }
         function screen(): void { shot.begin("screen", "snip"); }
+        function text(): void { shot.begin("region", "text"); }
+        function color(): void { shot.begin("color", "snip"); }
         function record(): void {
             if (Recorder.recording)
                 Recorder.stop();
@@ -95,6 +100,22 @@ Scope {
         }
     }
 
+    // A toast of our own, through the notification server like anyone else's.
+    function notify(summary, body) {
+        Quickshell.execDetached(["busctl", "--user", "--", "call", "org.freedesktop.Notifications", "/org/freedesktop/Notifications", "org.freedesktop.Notifications", "Notify", "susssasa{sv}i", "Ikigai", "0", "", summary, body, "0", "0", "4000"]);
+    }
+
+    // The pixel under the pointer, as hex, onto the clipboard.
+    function commitColor(hex) {
+        if (!frozen || closing || flashing)
+            return;
+        console.info("shot color", hex);
+        Apps.spawn(["sh", "-c", 'printf %s "$0" | wl-copy', hex]);
+        notify("Copied " + hex, "");
+        flashing = true;
+        flash.restart();
+    }
+
     function fileName() {
         const pad = n => (n < 10 ? "0" : "") + n;
         const d = new Date();
@@ -125,10 +146,12 @@ Scope {
             }
             if (action === "edit")
                 Apps.spawn(["satty", "--filename", path]);
+            else if (action === "text")
+                Apps.spawn(["sh", "-c", 'ikigai-shot ocr "$0"', path]);
             else
                 Apps.spawn(["sh", "-c", 'd="$(xdg-user-dir PICTURES)/Screenshots" && mkdir -p "$d" && cp "$0" "$d/$1" && wl-copy --type image/png < "$0"', path, fileName()]);
         }, Qt.size(Math.round(rect.width * dpr), Math.round(rect.height * dpr)));
-        if (action === "snip") {
+        if (action === "snip" || action === "text") {
             flashing = true;
             flash.restart();
         } else {
@@ -255,6 +278,7 @@ Scope {
             color: "transparent"
 
             readonly property string frozen: shot.frozen ? "file://" + shot.dir + "/" + modelData.name + ".png" : ""
+            readonly property bool picking: shot.mode === "color" && hover.hovered
             readonly property bool wholeScreen: shot.mode === "screen" && hover.hovered
             readonly property var target: shot.mode === "window" && hover.hovered ? windowUnder(hover.point.position) : null
             readonly property rect shown: wholeScreen ? Qt.rect(0, 0, content.width, content.height) : target ? target.rect : selection
@@ -319,13 +343,17 @@ Scope {
                     switch (event.key) {
                     case Qt.Key_Escape: shot.cancel(); break;
                     case Qt.Key_Tab: {
+                        if (shot.mode === "color")
+                            break;
                         const i = shot.actions.findIndex(a => a.id === shot.action);
                         shot.action = shot.actions[(i + 1) % shot.actions.length].id;
                         break;
                     }
                     case Qt.Key_Return:
                     case Qt.Key_Enter:
-                        if (window.selecting)
+                        if (window.picking)
+                            shot.commitColor(loupe.hex);
+                        else if (window.selecting)
                             shot.commit(window, window.shown);
                         break;
                     default: return;
@@ -337,7 +365,41 @@ Scope {
                     id: hover
                 }
 
+                // The frozen capture, painted once into a canvas as well so a pixel can
+                // be read back for the color pick.
+                Canvas {
+                    id: sampler
+                    anchors.fill: parent
+                    z: -1
+                    renderTarget: Canvas.Image
+                    renderStrategy: Canvas.Immediate
+                    canvasSize: Qt.size(Math.round(content.width * window.screen.devicePixelRatio), Math.round(content.height * window.screen.devicePixelRatio))
+                    property bool ready: false
+                    onImageLoaded: {
+                        const ctx = getContext("2d");
+                        ctx.drawImage(window.frozen, 0, 0, canvasSize.width, canvasSize.height);
+                        ready = true;
+                    }
+                    Component.onCompleted: if (window.frozen) loadImage(window.frozen)
+                    Connections {
+                        target: window
+                        function onFrozenChanged() {
+                            if (window.frozen)
+                                sampler.loadImage(window.frozen);
+                        }
+                    }
+                    function pixel(p) {
+                        if (!ready)
+                            return "#000000";
+                        const dpr = window.screen.devicePixelRatio;
+                        const d = getContext("2d").getImageData(Math.min(canvasSize.width - 1, Math.floor(p.x * dpr)), Math.min(canvasSize.height - 1, Math.floor(p.y * dpr)), 1, 1).data;
+                        const hex = n => (n < 16 ? "0" : "") + n.toString(16);
+                        return "#" + hex(d[0]) + hex(d[1]) + hex(d[2]);
+                    }
+                }
+
                 Image {
+                    id: frozenImage
                     anchors.fill: parent
                     source: window.frozen
                     cache: false
@@ -346,7 +408,82 @@ Scope {
 
                 Rectangle {
                     anchors.fill: parent
-                    color: Qt.alpha(Theme.colors.surface, 0.6)
+                    color: Qt.alpha(Theme.colors.surface, window.picking ? 0.15 : 0.6)
+
+                    Behavior on color {
+                        ColorAnim { fast: true }
+                    }
+                }
+
+                // The loupe: sixteen pixels across, magnified, the middle one outlined,
+                // its hex underneath.
+                Item {
+                    id: loupe
+                    readonly property point at: hover.point.position
+                    readonly property string hex: window.picking ? sampler.pixel(at) : "#000000"
+                    readonly property int size: Math.round(128 * Config.scale)
+                    visible: window.picking && !shot.flashing
+                    x: Math.min(at.x + 24, content.width - width - 8)
+                    y: Math.min(at.y + 24, content.height - height - 8)
+                    width: size
+                    height: size + Math.round(30 * Config.scale)
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 12
+                        color: Theme.colors.surfaceContainer
+                        border.width: 1
+                        border.color: Theme.colors.outlineVariant
+                    }
+
+                    Item {
+                        x: 4
+                        y: 4
+                        width: loupe.size - 8
+                        height: loupe.size - 8
+                        clip: true
+
+                        ShaderEffectSource {
+                            anchors.fill: parent
+                            sourceItem: frozenImage
+                            sourceRect: Qt.rect(loupe.at.x - 8, loupe.at.y - 8, 16, 16)
+                            smooth: false
+                            live: false
+                        }
+
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: parent.width / 16
+                            height: width
+                            color: "transparent"
+                            border.width: 1
+                            border.color: Theme.colors.fg
+                        }
+                    }
+
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: loupe.size + 2
+                        spacing: 6
+
+                        Rectangle {
+                            width: 14
+                            height: 14
+                            radius: 3
+                            color: loupe.hex
+                            border.width: 1
+                            border.color: Theme.colors.outlineVariant
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        Text {
+                            text: loupe.hex
+                            color: Theme.colors.fg
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                    }
                 }
 
                 // The undimmed selection: a clipped view of the frozen capture, and what
@@ -409,12 +546,16 @@ Scope {
 
                 MouseArea {
                     anchors.fill: parent
-                    cursorShape: !shot.frozen ? Qt.BlankCursor : shot.mode === "region" ? Qt.CrossCursor : Qt.PointingHandCursor
+                    cursorShape: !shot.frozen ? Qt.BlankCursor : shot.mode === "region" || shot.mode === "color" ? Qt.CrossCursor : Qt.PointingHandCursor
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
 
                     onPressed: mouse => {
                         if (mouse.button === Qt.RightButton) {
                             shot.cancel();
+                            return;
+                        }
+                        if (shot.mode === "color" && shot.frozen) {
+                            shot.commitColor(sampler.pixel(Qt.point(mouse.x, mouse.y)));
                             return;
                         }
                         if (shot.mode !== "region" || !shot.frozen)
@@ -480,6 +621,7 @@ Scope {
                         }
 
                         Rectangle {
+                            visible: shot.mode !== "color"
                             width: 1
                             height: Math.round(18 * Config.scale)
                             anchors.verticalCenter: parent.verticalCenter
@@ -487,6 +629,7 @@ Scope {
                         }
 
                         Row {
+                            visible: shot.mode !== "color"
                             spacing: 2
 
                             Repeater {
