@@ -23,7 +23,7 @@ Pinned and running apps at the top, the status items and clock at the bottom.
 | Microphone | shown while an app has a capture stream open, red when live and brighter as you speak (`ikigai-miclevel` meters the input meanwhile). Click mutes the input |
 | Update | an arrow while `ikigai-update --available` says there is something, asked two minutes after login and every six hours; click runs the update in a terminal |
 | Network | Wi-Fi switch, the wired link, networks in range. Click connects; a new secured network asks for its password. The connected row expands to Disconnect and Forget. VPNs: cosmic-settings |
-| Bluetooth | switch, paired devices, what is in range while the card is open. Click pairs and connects; battery where the device reports one. PIN or confirmation pairing: cosmic-settings, the card has no agent |
+| Bluetooth | switch, paired devices, what is in range while the card is open. Click pairs and connects; battery where the device reports one. A device that asks gets a prompt: a number to confirm, a code to type on a keyboard, a PIN or passkey to type here, or a yes/no for one that wants in (`ikigai-btagent`, bluez's agent run by the shell) |
 | Battery | time left, the power profile. Only when there is one |
 | Tray | StatusNotifier items, menus. A submenu opens in place, with a row at the top to go back |
 | Clock | opens the sidebar |

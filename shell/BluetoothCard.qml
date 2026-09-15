@@ -4,7 +4,7 @@ import QtQuick
 // The Bluetooth card: the switch, the devices paired or in range (searching while the
 // card is open), a click to connect or pair; the connected row and, on right-click, a
 // paired one expand to Disconnect and Forget. Pairing that needs a PIN or a confirmation
-// is cosmic-settings' Bluetooth page: this card has no agent.
+// gets a prompt of its own (BluetoothAuth), through the agent Bluetooth runs.
 PopupCard {
     id: card
 

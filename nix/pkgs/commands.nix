@@ -75,6 +75,10 @@ in
     python = true;
     runtimeInputs = [ glib ];
   };
+  ikigai-btagent = mkCommand "ikigai-btagent" {
+    python = true;
+    runtimeInputs = [ glib ];
+  };
   ikigai-doctor = mkCommand "ikigai-doctor" {
     runtimeInputs = [
       coreutils

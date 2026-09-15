@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""The Bluetooth pairing agent behind the rail's card: bluez's org.bluez.Agent1 as a
+process the shell runs, so a keyboard's code to type, a phone's number to confirm or an
+old headset's PIN reach the shell as a prompt instead of needing cosmic-settings.
+
+    ikigai-btagent
+
+One JSON object per line on stdout for each request bluez makes:
+  {"id": N, "kind": "confirm", "device": "...", "name": "...", "passkey": "123456"}
+  kinds: confirm (yes/no with the number), display (type the number on the device;
+  "entered" lines follow as digits land), passkey (a number to type here), pin (a PIN
+  to type here), authorize (let this device connect), service (let it use a service,
+  "uuid"), cancel (bluez gave up on request "id"), ready, gone (the agent was released).
+The shell answers on stdin, one per line: {"id": N, "ok": true, "value": "1234"}.
+Needs PyGObject.
+"""
+import json
+import os
+import signal
+import sys
+import threading
+import warnings
+
+warnings.simplefilter("ignore", DeprecationWarning)  # register_object, still the way with Gio
+
+import gi
+gi.require_version("Gio", "2.0")
+gi.require_version("GLib", "2.0")
+from gi.repository import Gio, GLib
+
+PATH = "/org/ikigai/agent"
+CAPABILITY = "KeyboardDisplay"
+
+AGENT_XML = """
+<node>
+  <interface name="org.bluez.Agent1">
+    <method name="Release"/>
+    <method name="RequestPinCode"><arg type="o" name="device" direction="in"/><arg type="s" name="pincode" direction="out"/></method>
+    <method name="DisplayPinCode"><arg type="o" name="device" direction="in"/><arg type="s" name="pincode" direction="in"/></method>
+    <method name="RequestPasskey"><arg type="o" name="device" direction="in"/><arg type="u" name="passkey" direction="out"/></method>
+    <method name="DisplayPasskey"><arg type="o" name="device" direction="in"/><arg type="u" name="passkey" direction="in"/><arg type="q" name="entered" direction="in"/></method>
+    <method name="RequestConfirmation"><arg type="o" name="device" direction="in"/><arg type="u" name="passkey" direction="in"/></method>
+    <method name="RequestAuthorization"><arg type="o" name="device" direction="in"/></method>
+    <method name="AuthorizeService"><arg type="o" name="device" direction="in"/><arg type="s" name="uuid" direction="in"/></method>
+    <method name="Cancel"/>
+  </interface>
+</node>
+"""
+
+loop = GLib.MainLoop()
+pending = {}  # id -> (kind, invocation)
+counter = 0
+
+
+def emit(**obj):
+    print(json.dumps(obj), flush=True)
+
+
+def device_name(bus, path):
+    try:
+        reply = bus.call_sync("org.bluez", path, "org.freedesktop.DBus.Properties", "Get",
+                              GLib.Variant("(ss)", ("org.bluez.Device1", "Alias")), None, Gio.DBusCallFlags.NONE, 1000, None)
+        return reply.unpack()[0]
+    except GLib.Error:
+        return path.rsplit("dev_", 1)[-1].replace("_", ":")
+
+
+def ask(bus, kind, invocation, device, **extra):
+    global counter
+    counter += 1
+    pending[counter] = (kind, invocation)
+    emit(id=counter, kind=kind, device=device, name=device_name(bus, device), **extra)
+
+
+def on_call(bus, sender, path, iface, method, params, invocation):
+    args = params.unpack()
+    if method == "Release":
+        emit(kind="gone")
+        invocation.return_value(None)
+        GLib.idle_add(loop.quit)
+    elif method == "RequestPinCode":
+        ask(bus, "pin", invocation, args[0])
+    elif method == "DisplayPinCode":
+        emit(id=0, kind="display", device=args[0], name=device_name(bus, args[0]), passkey=args[1])
+        invocation.return_value(None)
+    elif method == "RequestPasskey":
+        ask(bus, "passkey", invocation, args[0])
+    elif method == "DisplayPasskey":
+        # Repeats as digits are typed on the device; one prompt, updated.
+        emit(id=0, kind="display", device=args[0], name=device_name(bus, args[0]), passkey=f"{args[1]:06d}", entered=args[2])
+        invocation.return_value(None)
+    elif method == "RequestConfirmation":
+        ask(bus, "confirm", invocation, args[0], passkey=f"{args[1]:06d}")
+    elif method == "RequestAuthorization":
+        ask(bus, "authorize", invocation, args[0])
+    elif method == "AuthorizeService":
+        ask(bus, "service", invocation, args[0], uuid=args[1])
+    elif method == "Cancel":
+        for rid, (_kind, inv) in list(pending.items()):
+            inv.return_dbus_error("org.bluez.Error.Canceled", "Canceled")
+            emit(id=rid, kind="cancel")
+        pending.clear()
+        invocation.return_value(None)
+    else:
+        invocation.return_dbus_error("org.freedesktop.DBus.Error.UnknownMethod", method)
+
+
+def answer(line):
+    try:
+        reply = json.loads(line)
+    except ValueError:
+        return
+    entry = pending.pop(int(reply.get("id", 0)), None)
+    if not entry:
+        return
+    kind, invocation = entry
+    if not reply.get("ok"):
+        invocation.return_dbus_error("org.bluez.Error.Rejected", "Rejected")
+    elif kind == "pin":
+        invocation.return_value(GLib.Variant("(s)", (str(reply.get("value", "")),)))
+    elif kind == "passkey":
+        try:
+            invocation.return_value(GLib.Variant("(u)", (int(reply.get("value", "0")),)))
+        except ValueError:
+            invocation.return_dbus_error("org.bluez.Error.Rejected", "Rejected")
+    else:
+        invocation.return_value(None)
+
+
+def read_stdin():
+    for line in sys.stdin:
+        GLib.idle_add(answer, line.strip())
+    GLib.idle_add(loop.quit)  # the shell went away
+
+
+def main():
+    bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+    bus.register_object(PATH, Gio.DBusNodeInfo.new_for_xml(AGENT_XML).interfaces[0], on_call, None, None)
+    try:
+        bus.call_sync("org.bluez", "/org/bluez", "org.bluez.AgentManager1", "RegisterAgent",
+                      GLib.Variant("(os)", (PATH, CAPABILITY)), None, Gio.DBusCallFlags.NONE, -1, None)
+        bus.call_sync("org.bluez", "/org/bluez", "org.bluez.AgentManager1", "RequestDefaultAgent",
+                      GLib.Variant("(o)", (PATH,)), None, Gio.DBusCallFlags.NONE, -1, None)
+    except GLib.Error as err:
+        emit(kind="error", message=err.message)
+        return 1
+    emit(kind="ready", name=bus.get_unique_name())
+    threading.Thread(target=read_stdin, daemon=True).start()
+    signal.signal(signal.SIGTERM, lambda *_: loop.quit())
+    signal.signal(signal.SIGINT, lambda *_: loop.quit())
+    loop.run()
+    try:
+        bus.call_sync("org.bluez", "/org/bluez", "org.bluez.AgentManager1", "UnregisterAgent",
+                      GLib.Variant("(o)", (PATH,)), None, Gio.DBusCallFlags.NONE, 1000, None)
+    except GLib.Error:
+        pass
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (KeyboardInterrupt, BrokenPipeError):
+        os._exit(0)

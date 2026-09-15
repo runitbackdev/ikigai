@@ -42,6 +42,7 @@
 | `just doctor` | what is running |
 | `just check` | bash -n, shellcheck, config sanity, `nix flake check` (the crate's tests run inside its build) |
 | `just comp-test [binary]` | the layer-shell regression test for the compositor fork, nested |
+| Bluetooth prompt | with the shell running `ikigai-btagent` (installed, or `PATH=$(nix build .#ikigai-commands --print-out-paths --no-link)/bin:$PATH just shell`), a request from root stands in for a device: `sudo busctl --system call $(busctl --system list --no-legend \| awk -v pid=$(pgrep -f ikigai-btagent-wrapped) '$2 == pid {print $1}') /org/ikigai/agent org.bluez.Agent1 RequestConfirmation ou /org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF 123456`; the call returns when the prompt is answered |
 | `just tray-fixture` | a tray item with a submenu on the rail, for trying the tray menus by hand. Its Quit or Ctrl+C removes it |
 | `just comp-try [binary] [command]` | a client under a build of the fork, nested, with this tree's compositor config and cursors. Ghostty by default; libcosmic apps fork at startup and end the kiosk session |
 

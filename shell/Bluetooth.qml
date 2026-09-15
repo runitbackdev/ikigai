@@ -1,11 +1,16 @@
 pragma Singleton
 import Quickshell
+import Quickshell.Io
 import Quickshell.Bluetooth as Bluez
 import QtQuick
 
 // Bluetooth over bluez: the default adapter, its switch, and the devices it knows or can
 // see. Device state lives on bluez's objects, so the rows bind to them directly; only the
 // count of connected ones is kept here, for the rail glyph.
+//
+// Pairing prompts come through ikigai-btagent, bluez's agent run as a child for as long
+// as there is an adapter: each request lands in `request` for BluetoothAuth to show,
+// `answer` sends the reply back.
 Singleton {
     id: root
 
@@ -16,6 +21,9 @@ Singleton {
     readonly property var devices: present ? adapter.devices.values : []
     property int connectedCount: 0
     property string error: ""
+    // The pairing prompt up, if any: { id, kind, device, name, passkey, entered, uuid }.
+    // `display` prompts have no answer; they go when the device is done or gives up.
+    property var request: null
 
     readonly property string icon: !enabled ? "bluetooth-slash" : connectedCount > 0 ? "bluetooth-connected" : "bluetooth"
     readonly property string status: !present ? "No Bluetooth hardware" : !enabled ? "Bluetooth is off" : connectedCount === 0 ? (discovering ? "Searching" : "Bluetooth") : connectedNames()
@@ -91,6 +99,52 @@ Singleton {
         connectedCount = devices.filter(d => d.connected).length;
     }
 
+    function answer(ok, value) {
+        if (!request)
+            return;
+        if (request.id > 0)
+            agent.write(JSON.stringify({ id: request.id, ok: !!ok, value: value === undefined ? "" : String(value) }) + "\n");
+        request = null;
+    }
+
+    Process {
+        id: agent
+        command: ["ikigai-btagent"]
+        running: root.present
+        stdinEnabled: true
+        stdout: SplitParser {
+            onRead: line => {
+                let msg;
+                try {
+                    msg = JSON.parse(line);
+                } catch (e) {
+                    return;
+                }
+                switch (msg.kind) {
+                case "ready":
+                    console.info("bluetooth: agent registered as", msg.name);
+                    break;
+                case "gone":
+                    break;
+                case "error":
+                    console.warn("bluetooth: agent", msg.message);
+                    break;
+                case "cancel":
+                    if (root.request && root.request.id === msg.id)
+                        root.request = null;
+                    break;
+                default:
+                    root.request = msg;
+                }
+            }
+        }
+        onExited: (code, status) => {
+            root.request = null;
+            if (code !== 0 && code !== 143)
+                console.warn("bluetooth: ikigai-btagent exited", code);
+        }
+    }
+
     onDevicesChanged: recount()
 
     // One watcher per device: its connected flag and, once paired, the connect that follows.
@@ -101,8 +155,14 @@ Singleton {
             required property Bluez.BluetoothDevice modelData
             readonly property bool on: modelData.connected
             readonly property bool paired: modelData.paired || modelData.bonded
+            readonly property bool pairing: modelData.pairing
 
             onOnChanged: root.recount()
+            // Pairing over, either way: a display prompt has nothing left to show.
+            onPairingChanged: {
+                if (!pairing && root.request && root.request.kind === "display")
+                    root.request = null;
+            }
             onPairedChanged: {
                 if (paired && !modelData.connected) {
                     modelData.trusted = true;

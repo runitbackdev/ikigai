@@ -66,6 +66,7 @@ singleton Bluetooth 1.0 Bluetooth.qml
 BluetoothCard 1.0 BluetoothCard.qml
 NetworkCard 1.0 NetworkCard.qml
 WifiAuth 1.0 WifiAuth.qml
+BluetoothAuth 1.0 BluetoothAuth.qml
 TrayButton 1.0 TrayButton.qml
 TrayMenu 1.0 TrayMenu.qml
 TrayEntries 1.0 TrayEntries.qml

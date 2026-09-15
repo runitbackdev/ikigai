@@ -21,6 +21,7 @@ ShellRoot {
     Monitor {}
     Restore {}
     WifiAuth {}
+    BluetoothAuth {}
 
     IpcHandler {
         target: "osd"
