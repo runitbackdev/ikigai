@@ -36,8 +36,9 @@ used to read the leave as "something took over" and cancel; since 2026-09-13 it 
 focus loss instead (`shell/Switcher.qml`). The launcher and lock make the same assumption
 and could see the same blink.
 
-Fix: run `focus_target_is_valid` in `set_focus`, keep the focus-stack append so the window
-is next when the overlay closes. A few lines.
+Fixed on the fork 2026-09-15: the overlay rule is one function shared by both, and
+`set_focus` keeps the focus-stack append but leaves the keyboard alone while an overlay is
+up, so the window is next once it goes. A few lines. Not sent upstream yet.
 
 ### In kiosk mode the child's exit goes unnoticed until something else wakes the loop
 
@@ -93,10 +94,11 @@ driver rejected once. Medium; needs the hardware to test.
 ### Middle-click paste has no off switch
 
 Primary selection is offered to every client and Ghostty, Qt and COSMIC apps have no
-per-app switch. A patch that offers `zwp_primary_selection_device_manager_v1` to no
-client (Smithay's `new_with_filter`) was built and verified on 2026-09-06 and dropped
-because it needed a compositor rebuild on its own. Trivial once a fork exists; better as
-a config key upstream.
+per-app switch. On the fork since 2026-09-15: `primary_selection` in cosmic-comp-config,
+on by default; off, the global goes through Smithay's `new_with_filter` with a filter
+that admits no client, read from an `AtomicBool` the config reload sets, so it takes
+effect for every client that connects from then on. Ikigai's system config turns it off.
+Not sent upstream yet; would want a Settings toggle.
 
 ### Middle-click autoscroll with pan cursors
 

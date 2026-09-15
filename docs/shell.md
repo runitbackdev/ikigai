@@ -118,6 +118,10 @@ for a drag (Blender) go in the `exclude` list of
 by app id; a copy under `~/.config/cosmic` overrides it, `enabled: false` turns it off.
 Zen's and Chromium's own autoscroll are left off, since a middle click must stay a click.
 
+Middle-click paste is off, everywhere: the compositor fork offers the primary selection
+to no client (`primary_selection` in the same directory, `true` brings it back for apps
+started after the change). Select-to-copy goes with it; the clipboard is untouched.
+
 ## Settings
 
 cosmic-settings, with the rail in place of its panel. The Panel and Dock pages are inert.
