@@ -18,8 +18,16 @@ Singleton {
 
     readonly property var items: SystemTray.items.values
 
+    // Items that get no slot at all: the launcher's, since Super is its button.
+    readonly property var hidden: ["vicinae"]
+
     // Items no rail button stands for: these keep their own slot above the clock.
-    readonly property var loose: items.filter(item => root.ownerOf(item) === "")
+    readonly property var loose: items.filter(item => root.ownerOf(item) === "" && !root.isHidden(item))
+
+    function isHidden(item) {
+        const key = ((item.id || "") + " " + (item.title || "")).toLowerCase();
+        return hidden.some(name => key.includes(name));
+    }
 
     // The appId whose rail button owns this item, or "" while nothing on the rail does.
     function ownerOf(item) {

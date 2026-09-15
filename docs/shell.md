@@ -11,7 +11,7 @@ Pinned and running apps at the top, the status items and clock at the bottom.
 - Click focuses, again minimizes, middle-click closes.
 - Right-click: pin, unpin, move.
 - An app's tray item sits on its own button.
-- The launcher's window never counts as a running app.
+- The launcher's window never counts as a running app, and its tray icon is not shown.
 - Task view (`Super+W`): this screen's workspaces and their windows.
 
 ## Cards
