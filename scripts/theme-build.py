@@ -184,7 +184,7 @@ def gtk_css(palette):
 # the KDE/libXcursor SVG format cosmic-comp renders itself). ikigai-theme-set rasterises the
 # same SVGs into Xcursor files for the toolkits that only read those.
 CURSOR_SRC = Path(__file__).resolve().parent.parent / "cursors" / "bibata"
-CURSOR_OWN = CURSOR_SRC.parent / "ikigai"  # Ikigai's own shapes, drawn in Bibata's idiom
+CURSOR_OWN = CURSOR_SRC.parent / "ikigai"  # the pan cursors: Ikigai's ring, Bibata's arrow turned
 CURSOR_CANVAS = 256  # Bibata draws on a 256-unit canvas; hotspots.toml is in those units
 CURSOR_DELAY = 40    # ms per animation frame, upstream's x11_delay
 

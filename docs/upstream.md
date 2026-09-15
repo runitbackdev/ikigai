@@ -115,7 +115,7 @@ with the client keeping focus as under an implicit grab, and the cursor is one o
 shapes loaded by name (`pan-all`, `pan-n`, `pan-ne`, ...) with the resize arrows and
 `all-scroll` as fallbacks (`CursorShape` in `backend/render/cursor.rs`). Windows with an
 active pointer constraint, app ids in `exclude`, and presses with Super held are passed
-through. Ikigai draws the pan cursors (`cursors/ikigai`). Not sent upstream yet; a
+through. Ikigai draws the pan cursors (`cursors/ikigai`: its own origin ring, Bibata's arrow turned eight ways). Not sent upstream yet; a
 feature, not a fix, and the config key would want a Settings page.
 
 ### Not yet diagnosed

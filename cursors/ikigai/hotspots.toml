@@ -1,5 +1,7 @@
 # Ikigai's own cursors, same format as bibata/hotspots.toml (256-unit canvas).
-# The pan cursors are what cosmic-comp's middle-click autoscroll shows.
+# The pan cursors are what cosmic-comp's middle-click autoscroll shows: pan-all is drawn here
+# in Bibata's idiom, the eight directions are Bibata's sb_up_arrow turned (GPL-3, as bibata/).
+# All are centred on the pointer, so every hotspot is the middle of the canvas.
 
 [cursors]
 
