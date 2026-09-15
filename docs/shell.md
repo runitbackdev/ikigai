@@ -25,7 +25,7 @@ Pinned and running apps at the top, the status items and clock at the bottom.
 | Network | Wi-Fi switch, the wired link, networks in range. Click connects; a new secured network asks for its password. The connected row expands to Disconnect and Forget. VPNs: cosmic-settings |
 | Bluetooth | switch, paired devices, what is in range while the card is open. Click pairs and connects; battery where the device reports one. PIN or confirmation pairing: cosmic-settings, the card has no agent |
 | Battery | time left, the power profile. Only when there is one |
-| Tray | StatusNotifier items, menus. Submenus are not rendered |
+| Tray | StatusNotifier items, menus. A submenu opens in place, with a row at the top to go back |
 | Clock | opens the sidebar |
 
 ## Notifications

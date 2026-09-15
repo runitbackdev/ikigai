@@ -27,10 +27,8 @@ PopupCard {
     implicitWidth: menu.trayItem ? 240 : 220
     implicitHeight: rows.implicitHeight + 12
 
-    QsMenuOpener {
-        id: opener
-        menu: menu.trayItem ? menu.trayItem.menu : null
-    }
+    // Back at the top every time the card comes up.
+    onShownChanged: if (shown) trayEntries.reset()
 
     // One row, shared by our entries and the tray's: the tray's arrive with separators,
     // greyed-out items and check marks, and ours never do.
@@ -106,8 +104,9 @@ PopupCard {
             top: parent.top
         }
 
+        // Inside one of the tray's submenus the app's own entries step aside.
         Repeater {
-            model: menu.entries
+            model: trayEntries.nested ? [] : menu.entries
 
             Entry {
                 required property var modelData
@@ -121,22 +120,14 @@ PopupCard {
         Entry {
             width: rows.width
             separator: true
-            visible: opener.children.values.length > 0
+            visible: !trayEntries.nested && trayEntries.count > 0
         }
 
-        Repeater {
-            model: opener.children
-
-            Entry {
-                required property var modelData
-
-                width: rows.width
-                label: modelData.text
-                separator: modelData.isSeparator
-                available: modelData.enabled
-                checked: modelData.checkState === Qt.Checked
-                onActivated: modelData.triggered()
-            }
+        TrayEntries {
+            id: trayEntries
+            width: rows.width
+            menuHandle: menu.trayItem ? menu.trayItem.menu : null
+            onActivated: menu.done()
         }
     }
 }
