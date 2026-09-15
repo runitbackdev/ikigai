@@ -105,14 +105,25 @@ Item {
         id: sheet
         width: parent.width
         height: parent.height
+        clip: true
 
         Behavior on x {
             enabled: !drag.active
             Anim { fast: true }
         }
 
+        // The tint fills the row and is cut by the sheet's shape: drawn taller than the
+        // row with the sheet's radius, so the corners that fall inside the row are square
+        // and the last row's bottom ones take the sheet's curve. The top hangs in the
+        // border, so no top corner ever shows.
         StateLayer {
-            radius: 0
+            readonly property bool last: toast.index === Notifs.toasts.length - 1
+            anchors.fill: undefined
+            x: 0
+            y: -Theme.cardRadius
+            width: parent.width
+            height: parent.height + Theme.cardRadius + (last ? 0 : Theme.cardRadius)
+            radius: Theme.cardRadius
             hovered: hover.hovered
         }
 
