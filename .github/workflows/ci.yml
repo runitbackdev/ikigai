@@ -52,11 +52,13 @@ jobs:
           name: ikigai-desktop
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           skipPush: ${{ secrets.CACHIX_AUTH_TOKEN == '' }}
+      # `^*`: the debug output too, the larger of the two, so the wait below covers it.
       - name: cosmic-comp
-        run: nix build --accept-flake-config -L --no-link --print-out-paths .#cosmic-comp > "$RUNNER_TEMP/paths"
+        run: nix build --accept-flake-config -L --no-link --print-out-paths '.#cosmic-comp^*' > "$RUNNER_TEMP/paths"
       # The daemon uploads each path as it is built and the action stops it right after
-      # the build, with a 60 s drain hardcoded in cachix; a 40 MB path still in flight
-      # fails the job. Queue the outputs again with --wait, which returns once they are up.
+      # the build, with a 60 s drain hardcoded in cachix; a path still in flight (the
+      # compositor's outputs, 350 and 460 MB) fails the job. Queue the outputs again
+      # with --wait, which returns once they are up.
       - name: Wait for the push
         if: env.CACHIX_DAEMON_DIR != ''
         run: xargs cachix daemon push --socket "$CACHIX_DAEMON_DIR/daemon.sock" --wait < "$RUNNER_TEMP/paths"
