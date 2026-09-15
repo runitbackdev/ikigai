@@ -8,9 +8,9 @@ import QtQuick
 // mute, from the keys, the card or another app, shows the OSD.
 //
 // The microphone on the rail: shown while an app has a capture stream open, its level
-// from ikigai-miclevel for as long as that lasts, and its mute is Discord's own when
-// Discord is running, through the Mute entry of Discord's tray menu, so the rail and
-// Discord always agree; otherwise the input's mute in PipeWire.
+// from ikigai-miclevel for as long as that lasts; a click mutes the input in PipeWire.
+// (Driving Discord's own mute through its tray menu was tried on 2026-09-15 and taken
+// out: the entry is only there while in voice and the two never quite agreed.)
 Singleton {
     id: root
 
@@ -24,41 +24,6 @@ Singleton {
     readonly property bool recording: Pipewire.nodes.values.some(n => n.type === PwNodeType.AudioInStream && n.name !== "ikigai-miclevel")
     // The input's level, 0 to 1, while something is recording.
     property real level: 0
-
-    // Discord's Mute, from its tray menu: null when Discord is not up. Discord rebuilds
-    // that menu as voice comes and goes and never says so on the bus, so the menu is
-    // reopened when recording starts and every so often while it lasts.
-    readonly property var discordItem: Tray.items.find(i => (i.id || "").toLowerCase().startsWith("discord")) || null
-    readonly property var discordMute: discordMenu.children.values.find(e => e.text === "Mute") || null
-    readonly property bool discordMuted: discordMute !== null && discordMute.checkState === Qt.Checked
-    // What the rail's microphone shows: silent for whoever is listening.
-    readonly property bool micOff: micMuted || discordMuted
-
-    QsMenuOpener {
-        id: discordMenu
-        menu: root.discordItem ? root.discordItem.menu : null
-    }
-
-    function refreshDiscord() {
-        discordMenu.menu = null;
-        discordMenu.menu = Qt.binding(() => root.discordItem ? root.discordItem.menu : null);
-    }
-
-    onRecordingChanged: if (recording) refreshDiscord()
-
-    Timer {
-        interval: 15000
-        repeat: true
-        running: root.recording
-        onTriggered: root.refreshDiscord()
-    }
-
-    // After a click on Discord's Mute, its check mark a moment later.
-    Timer {
-        id: recheck
-        interval: 400
-        onTriggered: root.refreshDiscord()
-    }
 
     Process {
         id: meter
@@ -98,20 +63,9 @@ Singleton {
             sink.audio.muted = !sink.audio.muted;
     }
 
-    // Off anywhere means off: unmute everything; on means mute where it counts, Discord
-    // when it is up, else the input.
     function toggleMicMute() {
-        if (micOff) {
-            if (micMuted && source && source.audio)
-                source.audio.muted = false;
-            if (discordMuted)
-                discordMute.triggered();
-        } else if (discordMute) {
-            discordMute.triggered();
-        } else if (source && source.audio) {
-            source.audio.muted = true;
-        }
-        recheck.restart();
+        if (source && source.audio)
+            source.audio.muted = !source.audio.muted;
     }
 
     onVolumeChanged: Osd.show("volume")
