@@ -1,13 +1,13 @@
 <svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
 <!-- Ikigai's own, in Bibata's idiom: outline stroke under body stroke, round joins -->
-<path d="M168 128a40 40 0 1 0 -80 0a40 40 0 1 0 80 0" stroke="#eee3e0" stroke-width="33" stroke-linejoin="round" stroke-linecap="round"/>
-<path d="M168 128a40 40 0 1 0 -80 0a40 40 0 1 0 80 0" stroke="#100e0d" stroke-width="16" stroke-linejoin="round" stroke-linecap="round"/>
-<path d="M128 6L158 42H98Z" stroke="#eee3e0" stroke-width="37" stroke-linejoin="round" stroke-linecap="round" transform="rotate(0 128 128)"/>
-<path d="M128 6L158 42H98Z" stroke="#100e0d" stroke-width="20" stroke-linejoin="round" stroke-linecap="round" transform="rotate(0 128 128)"/>
-<path d="M128 6L158 42H98Z" stroke="#eee3e0" stroke-width="37" stroke-linejoin="round" stroke-linecap="round" transform="rotate(90 128 128)"/>
-<path d="M128 6L158 42H98Z" stroke="#100e0d" stroke-width="20" stroke-linejoin="round" stroke-linecap="round" transform="rotate(90 128 128)"/>
-<path d="M128 6L158 42H98Z" stroke="#eee3e0" stroke-width="37" stroke-linejoin="round" stroke-linecap="round" transform="rotate(180 128 128)"/>
-<path d="M128 6L158 42H98Z" stroke="#100e0d" stroke-width="20" stroke-linejoin="round" stroke-linecap="round" transform="rotate(180 128 128)"/>
-<path d="M128 6L158 42H98Z" stroke="#eee3e0" stroke-width="37" stroke-linejoin="round" stroke-linecap="round" transform="rotate(270 128 128)"/>
-<path d="M128 6L158 42H98Z" stroke="#100e0d" stroke-width="20" stroke-linejoin="round" stroke-linecap="round" transform="rotate(270 128 128)"/>
+<path d="M164 128a36 36 0 1 0 -72 0a36 36 0 1 0 72 0" stroke="#eee3e0" stroke-width="33" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M164 128a36 36 0 1 0 -72 0a36 36 0 1 0 72 0" stroke="#100e0d" stroke-width="16" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M128 22L156 54H100Z" fill="#eee3e0" stroke="#eee3e0" stroke-width="37" stroke-linejoin="round" stroke-linecap="round" transform="rotate(0 128 128)"/>
+<path d="M128 22L156 54H100Z" fill="#100e0d" stroke="#100e0d" stroke-width="20" stroke-linejoin="round" stroke-linecap="round" transform="rotate(0 128 128)"/>
+<path d="M128 22L156 54H100Z" fill="#eee3e0" stroke="#eee3e0" stroke-width="37" stroke-linejoin="round" stroke-linecap="round" transform="rotate(90 128 128)"/>
+<path d="M128 22L156 54H100Z" fill="#100e0d" stroke="#100e0d" stroke-width="20" stroke-linejoin="round" stroke-linecap="round" transform="rotate(90 128 128)"/>
+<path d="M128 22L156 54H100Z" fill="#eee3e0" stroke="#eee3e0" stroke-width="37" stroke-linejoin="round" stroke-linecap="round" transform="rotate(180 128 128)"/>
+<path d="M128 22L156 54H100Z" fill="#100e0d" stroke="#100e0d" stroke-width="20" stroke-linejoin="round" stroke-linecap="round" transform="rotate(180 128 128)"/>
+<path d="M128 22L156 54H100Z" fill="#eee3e0" stroke="#eee3e0" stroke-width="37" stroke-linejoin="round" stroke-linecap="round" transform="rotate(270 128 128)"/>
+<path d="M128 22L156 54H100Z" fill="#100e0d" stroke="#100e0d" stroke-width="20" stroke-linejoin="round" stroke-linecap="round" transform="rotate(270 128 128)"/>
 </svg>
