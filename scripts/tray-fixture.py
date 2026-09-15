@@ -141,7 +141,7 @@ def on_sni_get(conn, sender, path, iface, prop):
         "Id": GLib.Variant("s", "ikigai-fixture"),
         "Title": GLib.Variant("s", "Ikigai tray fixture"),
         "Status": GLib.Variant("s", "Active"),
-        "IconName": GLib.Variant("s", "dialog-information"),
+        "IconName": GLib.Variant("s", "zed"),  # in hicolor on any Ikigai box; the desktop theme is glyphs
         "Menu": GLib.Variant("o", "/MenuBar"),
         "ItemIsMenu": GLib.Variant("b", True),
     }[prop]
