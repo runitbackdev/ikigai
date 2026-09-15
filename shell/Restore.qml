@@ -34,8 +34,7 @@ Scope {
     readonly property string markerPath: Quickshell.env("XDG_RUNTIME_DIR") + "/ikigai-restored"
     readonly property string queuePath: Quickshell.env("XDG_RUNTIME_DIR") + "/ikigai-tabs"
     readonly property string ghostty: "com.mitchellh.ghostty"
-    // The launcher's window is a toplevel too; reopening it at login would be absurd.
-    readonly property var skip: ["vicinae"]
+    readonly property var skip: Tasks.hidden
 
     property var saved: null
     property bool markerChecked: false

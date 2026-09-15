@@ -9,6 +9,10 @@ Singleton {
     property var running: []
     signal taskViewToggled
 
+    // Windows that are not apps: the launcher's is a toplevel too, and shows for as long
+    // as it is open. Restore leaves these alone as well.
+    readonly property var hidden: ["vicinae"]
+
     readonly property var top: layout([...Config.pinned.top, ...running.filter(a => !pinnedAnywhere(a))])
     readonly property var bottom: layout([...Config.pinned.bottom])
 
@@ -17,7 +21,7 @@ Singleton {
         function onWindowsChanged() {
             const live = [];
             for (const w of Bridge.windows)
-                if (!live.includes(w.appId))
+                if (!live.includes(w.appId) && !root.hidden.includes(w.appId))
                     live.push(w.appId);
             root.running = [...root.running.filter(a => live.includes(a)), ...live.filter(a => !root.running.includes(a))];
         }

@@ -44,9 +44,11 @@ if [ "$available" = 1 ]; then
   exit 1
 fi
 
+clean=0
 if [ "$pull" = 1 ]; then
   if [ -d "$FLAKE/.git" ]; then
-    if git -C "$FLAKE" diff --quiet HEAD 2>/dev/null && git -C "$FLAKE" rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then
+    git -C "$FLAKE" diff --quiet HEAD 2>/dev/null && clean=1
+    if [ "$clean" = 1 ] && git -C "$FLAKE" rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then
       echo "==> pulling $FLAKE"
       git -C "$FLAKE" pull -q --ff-only || echo "pull failed; updating from what's checked out" >&2
     else
@@ -55,6 +57,13 @@ if [ "$pull" = 1 ]; then
   fi
   echo "==> inputs"
   nix flake update --flake "$FLAKE"
+  # The moved lock is a commit, not a dirty tree that blocks the next pull. Only on a
+  # checkout that was clean to begin with, and only the lock.
+  if [ -d "$FLAKE/.git" ] && [ "$clean" = 1 ] && ! git -C "$FLAKE" diff --quiet -- flake.lock; then
+    git -C "$FLAKE" commit -q -m "flake.lock: inputs updated by ikigai-update" -- flake.lock \
+      && echo "committed flake.lock; push when you like" \
+      || echo "could not commit flake.lock (git user set?)" >&2
+  fi
 fi
 
 before=$(readlink /run/current-system)
