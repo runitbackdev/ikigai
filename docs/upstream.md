@@ -127,8 +127,11 @@ feature, not a fix, and the config key would want a Settings page.
   this box; the bridge's thumbnail capture may be handed a buffer from the wrong render
   node. Harmless so far.
 - New windows open on the active output, which follows keyboard focus, so after login or
-  a wake they land wherever the compositor put focus. `shell/Screens.qml` nudges focus to
-  the primary. A primary-output setting upstream would replace that; design, not a bug.
+  a wake they landed wherever the compositor put focus, and `shell/Screens.qml` nudged
+  focus to the primary. On the fork since 2026-09-15: `primary_output` in
+  cosmic-comp-config, the output a seat falls back to when its own has gone or none has
+  been picked yet, and that becomes the seat's when it appears; the shell writes
+  `monitor` through to it. The nudge stays as a belt for a compositor without it.
 
 ## xdg-desktop-portal-cosmic
 

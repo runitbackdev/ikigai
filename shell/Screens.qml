@@ -47,10 +47,13 @@ Singleton {
 
     // The greeter runs as its own user and cannot read shell.json, so the primary's name
     // goes where it can look: /var/lib/ikigai/greeter/<user>, a sticky world-writable dir
-    // like /tmp (greeter/tmpfiles.conf). Rewritten whenever `monitor` changes.
+    // like /tmp (greeter/tmpfiles.conf). The compositor fork reads it as `primary_output`
+    // in its own config, the output a seat falls back to and moves to when it appears,
+    // so new windows land there after login and after the outputs wake. Both rewritten
+    // whenever `monitor` changes.
     Process {
         id: tell
-        command: ["sh", "-c", 'd=/var/lib/ikigai/greeter; [ -d "$d" ] && printf %s "$1" > "$d/$(id -un)"', "-", Config.monitor]
+        command: ["sh", "-c", 'd=/var/lib/ikigai/greeter; [ -d "$d" ] && printf %s "$1" > "$d/$(id -un)"; c="${XDG_CONFIG_HOME:-$HOME/.config}/cosmic/com.system76.CosmicComp/v1"; mkdir -p "$c" && printf \'"%s"\' "$1" > "$c/primary_output"', "-", Config.monitor]
         running: true
     }
 

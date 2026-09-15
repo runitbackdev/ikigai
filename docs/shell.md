@@ -143,7 +143,7 @@ The rail's own settings are `~/.config/ikigai/shell.json`, seeded once, reloaded
 | `autohide` | `true` | |
 | `scale` | `1.0` | |
 | `dnd` | `false` | do-not-disturb; the sidebar's bell writes it |
-| `monitor` | `""` | the primary screen: toasts, lock, polkit, welcome, the switcher, and the greeter's card. Empty is the first output the compositor lists |
+| `monitor` | `""` | the primary screen: toasts, lock, polkit, welcome, the switcher, the greeter's card, and where new windows land after login and wake (written through to the compositor fork as its `primary_output`). Empty is the first output the compositor lists |
 | `restore` | `true` | |
 | `taskbar` | `"all"` | `"screen"` shows each rail only its own screen's windows |
 
