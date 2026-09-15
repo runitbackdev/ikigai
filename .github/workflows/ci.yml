@@ -53,7 +53,13 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           skipPush: ${{ secrets.CACHIX_AUTH_TOKEN == '' }}
       - name: cosmic-comp
-        run: nix build --accept-flake-config -L --no-link .#cosmic-comp
+        run: nix build --accept-flake-config -L --no-link --print-out-paths .#cosmic-comp > "$RUNNER_TEMP/paths"
+      # The daemon uploads each path as it is built and the action stops it right after
+      # the build, with a 60 s drain hardcoded in cachix; a 40 MB path still in flight
+      # fails the job. Queue the outputs again with --wait, which returns once they are up.
+      - name: Wait for the push
+        if: env.CACHIX_DAEMON_DIR != ''
+        run: xargs cachix daemon push --socket "$CACHIX_DAEMON_DIR/daemon.sock" --wait < "$RUNNER_TEMP/paths"
 
   packages:
     needs: fork
@@ -70,9 +76,13 @@ jobs:
           skipPush: ${{ secrets.CACHIX_AUTH_TOKEN == '' }}
       - name: Packages
         run: |
-          nix build --accept-flake-config -L --no-link \
+          nix build --accept-flake-config -L --no-link --print-out-paths \
             .#ikigai-session .#ikigai-monitor .#ikigai-shell-plugins .#ikigai-shell .#ikigai-theme .#ikigai-icons \
-            .#ikigai-cosmic-config .#ikigai-commands .#ikigai-install .#phosphor-font .#zen
+            .#ikigai-cosmic-config .#ikigai-commands .#ikigai-install .#phosphor-font .#zen > "$RUNNER_TEMP/paths"
+      # As in fork: wait for the daemon's uploads before the action stops it.
+      - name: Wait for the push
+        if: env.CACHIX_DAEMON_DIR != ''
+        run: xargs cachix daemon push --socket "$CACHIX_DAEMON_DIR/daemon.sock" --wait < "$RUNNER_TEMP/paths"
 
   system:
     needs: packages
@@ -88,4 +98,8 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           skipPush: ${{ secrets.CACHIX_AUTH_TOKEN == '' }}
       - name: Example system
-        run: nix build --accept-flake-config -L --no-link .#nixosConfigurations.example.config.system.build.toplevel
+        run: nix build --accept-flake-config -L --no-link --print-out-paths .#nixosConfigurations.example.config.system.build.toplevel > "$RUNNER_TEMP/paths"
+      # As in fork: wait for the daemon's uploads before the action stops it.
+      - name: Wait for the push
+        if: env.CACHIX_DAEMON_DIR != ''
+        run: xargs cachix daemon push --socket "$CACHIX_DAEMON_DIR/daemon.sock" --wait < "$RUNNER_TEMP/paths"
