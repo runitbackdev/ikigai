@@ -6,6 +6,7 @@ named so the shell does not count it as an app recording.
     ikigai-miclevel
 """
 import os
+import signal
 import subprocess
 import sys
 
@@ -19,6 +20,9 @@ def main():
            "-P", f'{{ node.name = "{NAME}" application.name = "{NAME}" media.role = "Production" }}', "-"]
     rec = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     last = -1.0
+    # The shell going away closes our stdout or signals us; the recorder must not outlive that.
+    signal.signal(signal.SIGHUP, lambda *_: sys.exit(0))
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     try:
         while True:
             data = rec.stdout.read(CHUNK)
@@ -37,7 +41,11 @@ def main():
                 last = level
     finally:
         rec.terminate()
-    return rec.wait()
+        try:
+            rec.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            rec.kill()
+    return 0
 
 
 if __name__ == "__main__":

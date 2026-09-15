@@ -25,7 +25,10 @@ Singleton {
     // The input's level, 0 to 1, while something is recording.
     property real level: 0
 
-    // Discord's Mute, from its tray menu: null when Discord is not up.
+    // Discord's Mute, from its tray menu: null when Discord is not up. Discord rebuilds
+    // that menu as voice comes and goes and never says so on the bus, so the menu is
+    // reopened when recording starts and every so often while it lasts.
+    readonly property var discordItem: Tray.items.find(i => (i.id || "").toLowerCase().startsWith("discord")) || null
     readonly property var discordMute: discordMenu.children.values.find(e => e.text === "Mute") || null
     readonly property bool discordMuted: discordMute !== null && discordMute.checkState === Qt.Checked
     // What the rail's microphone shows: silent for whoever is listening.
@@ -33,10 +36,28 @@ Singleton {
 
     QsMenuOpener {
         id: discordMenu
-        menu: {
-            const item = Tray.items.find(i => (i.id || "").toLowerCase().startsWith("discord"));
-            return item ? item.menu : null;
-        }
+        menu: root.discordItem ? root.discordItem.menu : null
+    }
+
+    function refreshDiscord() {
+        discordMenu.menu = null;
+        discordMenu.menu = Qt.binding(() => root.discordItem ? root.discordItem.menu : null);
+    }
+
+    onRecordingChanged: if (recording) refreshDiscord()
+
+    Timer {
+        interval: 15000
+        repeat: true
+        running: root.recording
+        onTriggered: root.refreshDiscord()
+    }
+
+    // After a click on Discord's Mute, its check mark a moment later.
+    Timer {
+        id: recheck
+        interval: 400
+        onTriggered: root.refreshDiscord()
     }
 
     Process {
@@ -90,6 +111,7 @@ Singleton {
         } else if (source && source.audio) {
             source.audio.muted = true;
         }
+        recheck.restart();
     }
 
     onVolumeChanged: Osd.show("volume")
