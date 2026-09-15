@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# Ghostty's tabs for Restore, the way Windows Terminal brings its tabs back.
+#
+#   ikigai-tabs          the working directory of every Ghostty tab, oldest first
+#   ikigai-tabs open N   N more tabs in the oldest Ghostty window, over D-Bus
+#   ikigai-tabs take     pop the first line of the queue and print it
+#
+# The shell saves the list with the session. At login Restore queues it in
+# $XDG_RUNTIME_DIR/ikigai-tabs, launches Ghostty, then asks for the rest of the tabs;
+# each new Ghostty shell takes one line and starts there. A tab is a shell Ghostty
+# spawned, so a program running in it keeps its shell's directory. Ghostty's process is
+# the Nix wrapper's name, hence the second comm.
+set -euo pipefail
+queue=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/ikigai-tabs
+
+list() {
+  local g p
+  for g in $(pgrep -x 'ghostty|\.ghostty-wrappe' || true); do
+    for p in $(pgrep -P "$g" || true); do
+      case "$(ps -o comm= -p "$p" 2>/dev/null)" in ghostty | .ghostty-wrappe | "") continue ;; esac
+      printf '%s\t%s\n' "$(awk '{print $22}' "/proc/$p/stat" 2>/dev/null || echo 0)" \
+        "$(readlink "/proc/$p/cwd" 2>/dev/null || true)"
+    done
+  done | sort -n | cut -f2 | grep -v '^$' || true
+}
+
+open() {
+  local n=$1 w i
+  w=$(busctl --user tree com.mitchellh.ghostty 2>/dev/null | grep -o 'window/[0-9]*' | sort -t/ -k2 -n | head -1 || true)
+  [ -n "$w" ] || { echo "ikigai-tabs: no Ghostty window on the bus" >&2; exit 1; }
+  for ((i = 0; i < n; i++)); do
+    busctl --user call com.mitchellh.ghostty "/com/mitchellh/ghostty/$w" org.gtk.Actions Activate 'sava{sv}' new-tab 0 0
+    sleep 0.3 # each shell takes its line in turn
+  done
+}
+
+take() {
+  [ -s "$queue" ] || exit 1
+  exec 9>"$queue.lock"
+  flock 9
+  local first
+  first=$(head -n1 "$queue")
+  tail -n +2 "$queue" >"$queue.tmp" && mv "$queue.tmp" "$queue"
+  [ -n "$first" ] && printf '%s\n' "$first"
+}
+
+case "${1:-}" in
+  "") list ;;
+  open) open "${2:?ikigai-tabs open N}" ;;
+  take) take ;;
+  *) echo "usage: ikigai-tabs [open N | take]" >&2; exit 2 ;;
+esac

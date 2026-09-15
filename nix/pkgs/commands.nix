@@ -137,6 +137,16 @@ in
       jq
     ];
   };
+  ikigai-tabs = mkCommand "ikigai-tabs" {
+    runtimeInputs = [
+      coreutils
+      procps
+      util-linux
+      gnugrep
+      gawk
+      systemd
+    ];
+  };
   ikigai-update = mkCommand "ikigai-update" {
     runtimeInputs = [
       coreutils

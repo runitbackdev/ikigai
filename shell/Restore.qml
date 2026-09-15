@@ -19,11 +19,21 @@ import QtQuick
 // launched again for the rest, once: Ghostty opens a window per launch, Zen and Discord
 // reuse the running instance. An output that is not plugged in leaves its windows where
 // they land. Off with "restore": false in shell.json.
+//
+// Ghostty's tabs come back too, each in the directory it was in, the way Windows Terminal
+// does it: `ikigai-tabs` lists them (every half minute and after each window change) and
+// they are saved with the windows. At restore they go into a queue in XDG_RUNTIME_DIR
+// before Ghostty launches; every new Ghostty shell takes the first line and starts there.
+// Once the first window is up, `ikigai-tabs open` asks it for the tabs the windows' own
+// first shells will not take. Which tab was in which window is not known, so the first
+// window gets the extras.
 Scope {
     id: root
 
     readonly property string sessionPath: Theme.stateDir + "/session.json"
     readonly property string markerPath: Quickshell.env("XDG_RUNTIME_DIR") + "/ikigai-restored"
+    readonly property string queuePath: Quickshell.env("XDG_RUNTIME_DIR") + "/ikigai-tabs"
+    readonly property string ghostty: "com.mitchellh.ghostty"
     // The launcher's window is a toplevel too; reopening it at login would be absurd.
     readonly property var skip: ["vicinae"]
 
@@ -39,6 +49,11 @@ Scope {
     property var ignored: ({})
     property var toppedUp: ({})
     property string lastWritten: ""
+    // The Ghostty tab directories as last listed, and how many tabs restore still owes
+    // beyond the windows' first shells.
+    property var tabs: []
+    property int pendingTabs: 0
+    property bool tabsAsked: false
 
     function ready() {
         return saved !== null && markerChecked && entriesSettled && Bridge.connected && DesktopEntries.applications.values.length > 0;
@@ -66,7 +81,13 @@ Scope {
             appId: s.appId, output: s.output, workspace: String(s.workspace), maximized: !!s.maximized,
             id: null, requested: null, maximizeAsked: false
         }));
-        console.info("restore:", slots.length, "windows from", sessionPath);
+        const tabs = Array.isArray(saved.tabs) ? saved.tabs.filter(t => typeof t === "string" && t) : [];
+        const windows = slots.filter(s => s.appId === ghostty).length;
+        pendingTabs = windows > 0 ? Math.max(0, tabs.length - windows) : 0;
+        tabsAsked = false;
+        if (windows > 0 && tabs.length > 0)
+            queue.setText(tabs.join("\n") + "\n");
+        console.info("restore:", slots.length, "windows from", sessionPath, tabs.length ? "and " + tabs.length + " tabs" : "");
         for (const appId of [...new Set(slots.map(s => s.appId))])
             Apps.launch(Apps.entryFor(appId));
         if (slots.length === 0)
@@ -86,6 +107,12 @@ Scope {
                 slot.id = w.id;
             else
                 ignored[w.id] = true;
+            if (slot && slot.appId === ghostty && !tabsAsked && pendingTabs > 0) {
+                tabsAsked = true;
+                console.info("restore: asking Ghostty for", pendingTabs, "more tabs");
+                opener.command = ["ikigai-tabs", "open", String(pendingTabs)];
+                opener.running = true;
+            }
         }
         // Lowest workspace first: cosmic-comp collapses an empty workspace between two
         // used ones, so 3 only holds while 2 is occupied. A slot waits for the slots
@@ -164,6 +191,8 @@ Scope {
         restoring = false;
         slots = [];
         saving = true;
+        if (!opener.running)
+            drain.restart();
         debounce.restart();
     }
 
@@ -180,7 +209,7 @@ Scope {
                 continue;
             windows.push({ appId: w.appId, output: output, workspace: space.name, maximized: w.states.includes("maximized") });
         }
-        const text = JSON.stringify({ windows: windows }, null, 2) + "\n";
+        const text = JSON.stringify({ windows: windows, tabs: tabs }, null, 2) + "\n";
         if (text === lastWritten)
             return;
         lastWritten = text;
@@ -240,6 +269,40 @@ Scope {
         }
     }
 
+    // The tab directories the new Ghostty shells take from, one per line.
+    FileView {
+        id: queue
+        path: root.queuePath
+        printErrors: false
+    }
+
+    Process {
+        id: opener
+        onExited: (code, status) => {
+            if (code !== 0)
+                console.warn("restore: ikigai-tabs open failed", code);
+            if (!root.restoring)
+                drain.restart();
+        }
+    }
+
+    Process {
+        id: probe
+        command: ["ikigai-tabs"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.tabs = text.split("\n").filter(t => t);
+                root.save();
+            }
+        }
+        onExited: (code, status) => {
+            if (code !== 0) {
+                console.warn("restore: ikigai-tabs failed", code);
+                root.save();
+            }
+        }
+    }
+
     FileView {
         id: marker
         path: root.markerPath
@@ -269,7 +332,26 @@ Scope {
     Timer {
         id: debounce
         interval: 2000
-        onTriggered: root.save()
+        onTriggered: {
+            if (root.saving && Bridge.connected && !probe.running)
+                probe.running = true;
+        }
+    }
+
+    // Tabs open, close and change directory without a window changing.
+    Timer {
+        interval: 30000
+        repeat: true
+        running: root.saving && Bridge.connected
+        onTriggered: debounce.restart()
+    }
+
+    // Whatever the shells did not take, a few seconds after restore is done, so a tab
+    // opened later starts at home like any other.
+    Timer {
+        id: drain
+        interval: 5000
+        onTriggered: queue.setText("")
     }
 
     Timer {

@@ -96,7 +96,9 @@ passwords faillock locks the account for ten minutes and the card says so.
 ## Restore
 
 Log back in and the apps you had come back, each on its output and workspace, maximized
-if it was. The app, not its contents. Off with `"restore": false`.
+if it was. The app, not its contents, except Ghostty's tabs: each comes back in the
+directory it was in, the way Windows Terminal does it, with the first window holding the
+extras when there were several. Off with `"restore": false`.
 
 ## First login
 

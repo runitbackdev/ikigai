@@ -96,6 +96,13 @@ in
         zj = "zellij attach --create main";
       };
       initContent = ''
+        # A login's Ghostty tabs come back where they were: Restore queues their directories
+        # and each new Ghostty shell takes the first (shell/Restore.qml, ikigai-tabs).
+        if [ "$TERM_PROGRAM" = ghostty ] && [ -s "''${XDG_RUNTIME_DIR:-/run/user/$UID}/ikigai-tabs" ]; then
+          ikigai_tab=$(ikigai-tabs take 2>/dev/null) && [ -d "$ikigai_tab" ] && cd -- "$ikigai_tab"
+          unset ikigai_tab
+        fi
+
         setopt AUTO_CD INTERACTIVE_COMMENTS
         zstyle ':completion:*' menu select
         zstyle ':completion:*' matcher-list 'm:{a-zA-Z}={A-Za-z}'
