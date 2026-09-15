@@ -150,12 +150,28 @@ PanelWindow {
 
             BlobRect {
                 group: blobs
-                x: popouts.x + (popouts.card ? 0 : -50)
-                y: popouts.card ? popouts.card.y : 0
-                implicitWidth: popouts.card ? popouts.card.width : 0
-                implicitHeight: popouts.card ? popouts.card.height : 0
+                x: popouts.x + (popouts.card ? popouts.base.x : -50)
+                y: popouts.card ? popouts.base.y : 0
+                implicitWidth: popouts.card ? popouts.base.width : 0
+                implicitHeight: popouts.card ? popouts.base.height : 0
                 radius: Theme.cardRadius
                 deformScale: 0.15 / 10000
+            }
+
+            // A menu's open submenus, one panel each beside the card.
+            Repeater {
+                model: popouts.panels
+
+                BlobRect {
+                    required property var modelData
+                    group: blobs
+                    x: popouts.x + modelData.x
+                    y: modelData.y
+                    implicitWidth: modelData.width
+                    implicitHeight: modelData.height
+                    radius: Theme.cardRadius
+                    deformScale: 0.15 / 10000
+                }
             }
 
             // The toast sheet, oversized upward so it hangs out of the top border.

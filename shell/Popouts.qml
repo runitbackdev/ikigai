@@ -18,6 +18,9 @@ Item {
     readonly property bool networkOpen: current === network
     readonly property bool bluetoothOpen: current === bluetooth
     readonly property Item card: frame.height > 0 ? frame : null
+    // What to draw: the card's own blob, and a blob per panel the content has beside it.
+    readonly property rect base: card ? Qt.rect(frame.x, frame.y, frame.content.baseWidth, frame.content.baseHeight) : Qt.rect(0, 0, 0, 0)
+    readonly property var panels: card && frame.content.panels ? frame.content.panels.map(p => Qt.rect(frame.x + p.x, frame.y + p.y, p.width, p.height)) : []
 
     width: 280
 

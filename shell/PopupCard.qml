@@ -6,6 +6,11 @@ Item {
     property var task: null
     property bool shown: false
     default property alias content: body.data
+    // What the card's own blob covers, and further panels beside it (a menu's open
+    // submenus), in the card's coordinates. By default the whole card and nothing else.
+    property real baseWidth: implicitWidth
+    property real baseHeight: implicitHeight
+    property var panels: []
 
     signal done
 

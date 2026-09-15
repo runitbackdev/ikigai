@@ -24,8 +24,10 @@ PopupCard {
         return list;
     }
 
-    implicitWidth: menu.trayItem ? 240 : 220
+    implicitWidth: Math.max(menu.trayItem ? 240 : 220, trayEntries.implicitWidth + 12)
     implicitHeight: rows.implicitHeight + 12
+    baseWidth: Math.max(menu.trayItem ? 240 : 220, trayEntries.baseWidth + 12)
+    panels: trayEntries.panels
 
     // Back at the top every time the card comes up.
     onShownChanged: if (shown) trayEntries.reset()
@@ -104,9 +106,8 @@ PopupCard {
             top: parent.top
         }
 
-        // Inside one of the tray's submenus the app's own entries step aside.
         Repeater {
-            model: trayEntries.nested ? [] : menu.entries
+            model: menu.entries
 
             Entry {
                 required property var modelData
@@ -120,12 +121,14 @@ PopupCard {
         Entry {
             width: rows.width
             separator: true
-            visible: !trayEntries.nested && trayEntries.count > 0
+            visible: trayEntries.count > 0
         }
 
         TrayEntries {
             id: trayEntries
-            width: rows.width
+            // The first column spans the card like the app's own rows above it.
+            minWidth: (menu.trayItem ? 240 : 220) - 12
+            card: menu
             menuHandle: menu.trayItem ? menu.trayItem.menu : null
             onActivated: menu.done()
         }
