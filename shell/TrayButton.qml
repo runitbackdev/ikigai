@@ -12,6 +12,12 @@ BarButton {
 
     signal menuRequested(Item at)
 
+    // The bar button's own mouse area is on top of everything here, so the clicks come
+    // as its signals.
+    onClicked: item.onlyMenu ? menuRequested(button) : item.activate()
+    onRightClicked: menuRequested(button)
+    onMiddleClicked: item.secondaryActivate()
+
     Image {
         anchors.centerIn: parent
         width: Theme.iconSize
@@ -20,19 +26,6 @@ BarButton {
         sourceSize: Qt.size(64, 64)
         fillMode: Image.PreserveAspectFit
         opacity: button.item.status === Status.Passive ? 0.6 : 1
-    }
-
-    MouseArea {
-        anchors.fill: parent
-        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
-        onClicked: event => {
-            if (event.button === Qt.RightButton || (event.button === Qt.LeftButton && button.item.onlyMenu))
-                button.menuRequested(button);
-            else if (event.button === Qt.MiddleButton)
-                button.item.secondaryActivate();
-            else
-                button.item.activate();
-        }
     }
 
     WheelHandler {

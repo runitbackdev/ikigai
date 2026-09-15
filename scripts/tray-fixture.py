@@ -111,6 +111,7 @@ def layout(item_id, depth, names):
 def on_menu_call(conn, sender, path, iface, method, params, invocation):
     if method == "GetLayout":
         parent, depth, names = params.unpack()
+        print(f"GetLayout {parent} depth {depth}", flush=True)
         invocation.return_value(GLib.Variant("(u(ia{sv}av))", (1, layout(parent, depth, names))))
     elif method == "GetGroupProperties":
         ids, names = params.unpack()
@@ -126,6 +127,7 @@ def on_menu_call(conn, sender, path, iface, method, params, invocation):
             GLib.idle_add(loop.quit)
         invocation.return_value(None)
     elif method == "AboutToShow":
+        print(f"AboutToShow {params.unpack()[0]}", flush=True)
         invocation.return_value(GLib.Variant("(b)", (False,)))
     else:
         invocation.return_dbus_error("org.freedesktop.DBus.Error.UnknownMethod", method)
@@ -167,9 +169,8 @@ def register(conn, name):
 def on_bus(conn, name):
     conn.register_object("/StatusNotifierItem", Gio.DBusNodeInfo.new_for_xml(SNI_XML).interfaces[0], on_sni_call, on_sni_get, None)
     conn.register_object("/MenuBar", Gio.DBusNodeInfo.new_for_xml(MENU_XML).interfaces[0], on_menu_call, on_menu_get, None)
-    register(conn, name)
-    # A new watcher (a restarted shell, `just shell`) starts empty: register again, as
-    # every tray app does.
+    # Register with the watcher there is, and again with each new one (a restarted shell,
+    # `just shell`), as every tray app does: the watch fires once for the current owner.
     Gio.bus_watch_name_on_connection(conn, "org.kde.StatusNotifierWatcher", Gio.BusNameWatcherFlags.NONE,
                                      lambda c, _n, _owner: register(c, name), None)
 

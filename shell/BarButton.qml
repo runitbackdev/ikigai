@@ -9,6 +9,7 @@ Item {
 
     signal clicked
     signal rightClicked
+    signal middleClicked
 
     implicitWidth: Theme.barWidth - 8
     implicitHeight: Theme.barWidth - 8
@@ -40,7 +41,14 @@ Item {
     MouseArea {
         id: press
         anchors.fill: parent
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onClicked: mouse => mouse.button === Qt.RightButton ? button.rightClicked() : button.clicked()
+        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+        onClicked: mouse => {
+            if (mouse.button === Qt.RightButton)
+                button.rightClicked();
+            else if (mouse.button === Qt.MiddleButton)
+                button.middleClicked();
+            else
+                button.clicked();
+        }
     }
 }
