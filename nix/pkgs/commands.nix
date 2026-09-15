@@ -26,6 +26,7 @@
   wl-clipboard,
   xdg-user-dirs,
   gpu-screen-recorder,
+  pipewire,
   nix,
   nixos-rebuild-ng,
   ikigai-shell,
@@ -136,6 +137,10 @@ in
       gnugrep
       jq
     ];
+  };
+  ikigai-miclevel = mkCommand "ikigai-miclevel" {
+    python = true;
+    runtimeInputs = [ pipewire ];
   };
   ikigai-tabs = mkCommand "ikigai-tabs" {
     runtimeInputs = [

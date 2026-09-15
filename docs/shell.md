@@ -20,7 +20,7 @@ Pinned and running apps at the top, the status items and clock at the bottom.
 |---|---|
 | Volume | level, mute, output picker. Scroll on the glyph steps it |
 | Caffeine | the cup keeps the screen on: click toggles until turned off, right-click picks 30 or 90 minutes or 3 hours. `ikigai-shell caffeine toggle` from a key; a caffeinate started in a terminal is its own |
-| Microphone | shown while an app has a capture stream open, red when live; click mutes the input |
+| Microphone | shown while an app has a capture stream open, red when live and brighter as you speak (`ikigai-miclevel` meters the input meanwhile). Click mutes: Discord's own mute through its tray menu when Discord is running, so the two agree, else the input in PipeWire |
 | Update | an arrow while `ikigai-update --available` says there is something, asked two minutes after login and every six hours; click runs the update in a terminal |
 | Network | Wi-Fi switch, the wired link, networks in range. Click connects; a new secured network asks for its password. The connected row expands to Disconnect and Forget. VPNs: cosmic-settings |
 | Bluetooth | switch, paired devices, what is in range while the card is open. Click pairs and connects; battery where the device reports one. PIN or confirmation pairing: cosmic-settings, the card has no agent |

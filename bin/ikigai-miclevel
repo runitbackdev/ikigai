@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""The default input's level, for the rail's microphone: one number per line, 0 to 1,
+about twenty a second, only when it moved. A capture stream of its own on PipeWire,
+named so the shell does not count it as an app recording.
+
+    ikigai-miclevel
+"""
+import os
+import subprocess
+import sys
+
+RATE = 8000
+CHUNK = RATE // 20 * 2  # 50 ms of s16 mono
+NAME = "ikigai-miclevel"
+
+
+def main():
+    cmd = ["pw-record", "--raw", "--format=s16", f"--rate={RATE}", "--channels=1",
+           "-P", f'{{ node.name = "{NAME}" application.name = "{NAME}" media.role = "Production" }}', "-"]
+    rec = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    last = -1.0
+    try:
+        while True:
+            data = rec.stdout.read(CHUNK)
+            if not data:
+                break
+            peak = 0
+            for i in range(0, len(data) - 1, 2):
+                v = int.from_bytes(data[i:i + 2], "little", signed=True)
+                if v < 0:
+                    v = -v
+                if v > peak:
+                    peak = v
+            level = min(1.0, peak / 32768 * 3)  # speech peaks low; scale so talking reads
+            if abs(level - last) >= 0.03 or (level == 0 and last != 0):
+                print(f"{level:.2f}", flush=True)
+                last = level
+    finally:
+        rec.terminate()
+    return rec.wait()
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (KeyboardInterrupt, BrokenPipeError):
+        os._exit(0)

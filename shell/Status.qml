@@ -49,12 +49,22 @@ Column {
         visible: Audio.recording
         onClicked: Audio.toggleMicMute()
 
+        // Red while live, brighter and a touch larger as you speak, grey when off.
         Glyph {
             anchors.centerIn: parent
-            name: Audio.micMuted ? "microphone-slash" : "microphone"
+            name: Audio.micOff ? "microphone-slash" : "microphone"
             size: Theme.iconSize
-            fill: !Audio.micMuted
-            color: Audio.micMuted ? Theme.colors.fgVariant : Theme.colors.error
+            fill: !Audio.micOff
+            color: Audio.micOff ? Theme.colors.fgVariant : Qt.lighter(Theme.colors.error, 1 + Audio.level * 0.6)
+            scale: Audio.micOff ? 1 : 1 + Audio.level * 0.2
+
+            Behavior on color {
+                ColorAnim { fast: true }
+            }
+
+            Behavior on scale {
+                Anim { fast: true }
+            }
         }
     }
 
