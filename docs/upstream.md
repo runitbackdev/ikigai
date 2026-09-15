@@ -120,6 +120,18 @@ active pointer constraint, app ids in `exclude`, and presses with Super held are
 through. Ikigai draws the pan cursors (`cursors/ikigai`: its own origin ring, Bibata's arrow turned eight ways). Not sent upstream yet; a
 feature, not a fix, and the config key would want a Settings page.
 
+### A layer surface with no output goes to the pointer's monitor
+
+`new_layer_surface` (`src/wayland/handlers/layer_shell.rs`) places a surface that names
+no output on `seat.active_output()`, which follows the pointer. New toplevels use
+`focused_or_active_output()`, the keyboard's. Vicinae names no output, so with two
+monitors its window went wherever the mouse rested while the shell's card dropped on
+the focused window's screen: Vicinae with no card on one, an empty card on the other.
+
+Fixed on the fork 2026-09-15: layer surfaces take the keyboard's output too, the
+pointer's only when nothing has focus. The card holds exclusive focus while it drops,
+so Vicinae lands on it. One line. Not sent upstream yet.
+
 ### Not yet diagnosed
 
 - `Failed to render texture ..., import for wrong devices DrmNode { ty: Render }` in the

@@ -7,6 +7,11 @@ import QtQuick
 // the card lands and sits over it on the overlay layer. Vicinae hides itself on Escape, on a launch or on focus loss and has
 // no hook for it, so while it is up `vicinae state open` is polled and the card lifts
 // when it says closed. `ikigai-shell launcher open|close|toggle`, Super's binding.
+//
+// Vicinae names no output, so the compositor places its window; the fork puts an
+// output-less layer surface where the keyboard focus is, and that is this card
+// (exclusive focus while it drops), so the two land on the same screen. Stock
+// cosmic-comp uses the pointer's output instead and the two can split.
 Scope {
     id: launcher
 
@@ -44,12 +49,33 @@ Scope {
         id: vicinaeOpen
         command: ["vicinae", "open"]
         onExited: (code, status) => {
-            if (!launcher.open)
+            // Closed again while this ran: the window is up with no card under it.
+            if (!launcher.open) {
+                if (code === 0)
+                    vicinaeClose.running = true;
                 return;
+            }
             if (code === 0) {
                 launcher.vicinae = true;
             } else {
-                console.warn("launcher: vicinae open failed", code);
+                // "Already opened" is the usual failure: Vicinae was up on its own,
+                // from a shell restart or a run of its own. Adopt it if so.
+                adopt.running = true;
+            }
+        }
+    }
+
+    Process {
+        id: adopt
+        command: ["vicinae", "state", "open"]
+        onExited: (code, status) => {
+            if (!launcher.open)
+                return;
+            if (code === 0) {
+                console.info("launcher: vicinae already open, adopted");
+                launcher.vicinae = true;
+            } else {
+                console.warn("launcher: vicinae open failed");
                 launcher.open = false;
             }
         }
