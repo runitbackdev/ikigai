@@ -18,7 +18,7 @@ Pinned and running apps at the top, the status items and clock at the bottom.
 
 | | |
 |---|---|
-| Volume | level, mute, output picker. Scroll on the glyph steps it |
+| Volume | level, mute, output picker, and a row per app playing sound with its own slider; a click on the app's glyph mutes it. Scroll on the rail glyph steps the output |
 | Caffeine | the cup keeps the screen on: click toggles until turned off, right-click picks 30 or 90 minutes or 3 hours. `ikigai-shell caffeine toggle` from a key; a caffeinate started in a terminal is its own |
 | Microphone | shown while an app has a capture stream open, red when live and brighter as you speak (`ikigai-miclevel` meters the input meanwhile). Click mutes the input |
 | Update | an arrow while `ikigai-update --available` says there is something, asked two minutes after login and every six hours; click runs the update in a terminal |

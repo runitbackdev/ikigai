@@ -25,6 +25,62 @@ Singleton {
     // The input's level, 0 to 1, while something is recording.
     property real level: 0
 
+    // Every app playing sound, one entry per application name with all its streams,
+    // for the volume card's per-app rows. The glyph is the rail's for the app when one
+    // can be matched by name or binary, else a generic one.
+    readonly property var streams: Pipewire.nodes.values.filter(n => n.type === PwNodeType.AudioOutStream)
+    readonly property var apps: {
+        const groups = {};
+        for (const n of streams) {
+            const p = n.properties || {};
+            const name = p["application.name"] || n.nickname || n.name || "?";
+            if (!groups[name])
+                groups[name] = { name: name, glyph: glyphForStream(n), nodes: [] };
+            groups[name].nodes.push(n);
+        }
+        return Object.values(groups).sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    PwObjectTracker {
+        objects: root.streams
+    }
+
+    function glyphForStream(node) {
+        const p = node.properties || {};
+        const hints = [p["application.name"], p["application.process.binary"], node.name].filter(h => h).map(h => h.toLowerCase());
+        for (const appId of [...Config.pinned.top, ...Config.pinned.bottom, ...Tasks.running]) {
+            const id = appId.toLowerCase();
+            const last = Apps.short(appId).toLowerCase();
+            if (hints.some(h => h === id || h === last || id.includes(h) || h.includes(last)))
+                return Apps.glyphFor(appId);
+        }
+        if (hints.some(h => h.includes("wine") || h.endsWith(".exe")))
+            return "game-controller";
+        return "waveform";
+    }
+
+    function appVolume(app) {
+        const n = app.nodes.find(n => n.audio);
+        return n ? n.audio.volume : 0;
+    }
+
+    function appMuted(app) {
+        return app.nodes.every(n => n.audio && n.audio.muted);
+    }
+
+    function setAppVolume(app, v) {
+        for (const n of app.nodes)
+            if (n.audio)
+                n.audio.volume = Math.max(0, Math.min(1, v));
+    }
+
+    function toggleAppMute(app) {
+        const muted = appMuted(app);
+        for (const n of app.nodes)
+            if (n.audio)
+                n.audio.muted = !muted;
+    }
+
     Process {
         id: meter
         command: ["ikigai-miclevel"]
