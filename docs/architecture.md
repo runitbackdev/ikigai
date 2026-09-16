@@ -108,7 +108,7 @@ defaults with an option each: `ikigai.gpu`, `ikigai.theme`, `ikigai.steam.enable
 | `system.nix` | what [system.md](system.md) describes |
 | `packages.nix` | the system half of the dev stack |
 | `gpu.nix`, `steam.nix` | the driver, Steam |
-| `compat.nix` | nix-ld, envfs, AppImage |
+| `compat.nix` | nix-ld, envfs |
 | `nix.nix` | flakes, the binary cache, garbage collection |
 
 `nix/home/default.nix` is the Home Manager module, applied to `ikigai.user` through

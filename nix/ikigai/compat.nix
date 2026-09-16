@@ -1,6 +1,6 @@
 # Binaries from outside nixpkgs, which a developer box downloads all day: mise's toolchains,
 # Zed's language servers, Claude Code's own installer. nix-ld gives them the loader and
-# libraries they expect, envfs the /usr/bin shebangs, appimage-run the AppImages.
+# libraries they expect, envfs the /usr/bin shebangs.
 {
   config,
   lib,
@@ -73,9 +73,5 @@ in
       ];
     };
     services.envfs.enable = true;
-    programs.appimage = {
-      enable = true;
-      binfmt = true;
-    };
   };
 }

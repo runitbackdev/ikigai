@@ -79,7 +79,7 @@ run on hardware or in a VM.
 - gcc, make, pkg-config, rustup, gh, just, Claude Code, mise, Docker + lazydocker, yazi, lazygit, btop, ripgrep, fd, fzf, bat, eza, dust, delta, tealdeer, jq, plocate, fastfetch.
 - JetBrainsMono Nerd Font, Noto with CJK and emoji.
 - PipeWire, NetworkManager, bluez, gnome-keyring unlocked at login, the firewall, zram, systemd-oomd, the LAVD scheduler ([docs/system.md](docs/system.md)).
-- nix-ld, envfs and AppImage support, so the binaries mise, Zed and Claude Code download run as they would elsewhere.
+- nix-ld and envfs, so the binaries mise, Zed and Claude Code download run as they would elsewhere.
 - Steam on demand: `ikigai.steam.enable`, then `ikigai-steam`.
 
 ## Keys

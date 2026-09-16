@@ -64,8 +64,7 @@ unload the running kernel's modules.
 
 A developer box downloads binaries all day: mise's toolchains, Zed's language servers,
 Claude Code's installer. nix-ld gives them the loader and a generous library list
-(`compat.nix`), envfs the `/usr/bin` shebangs, and `programs.appimage` with binfmt runs
-AppImages directly.
+(`compat.nix`), envfs the `/usr/bin` shebangs.
 
 ## Fixes
 
