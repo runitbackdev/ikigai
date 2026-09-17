@@ -1,5 +1,9 @@
 # Upstream
 
+Ikigai maintains its AI-assisted patches downstream; no upstream submissions are
+planned. See the [fork policy and maintenance decision](review-2026-09.md#fork-policy-and-maintenance).
+The technical notes below describe dependencies and workarounds, not a submission roadmap.
+
 What Ikigai works around that belongs in COSMIC, and what it would take to fix there.
 Each entry: the symptom, where the workaround lives, the fix, and the size. Ordered by
 what a fork would earn first. Started 2026-09-13; every entry re-checked against epoch-1.8.0 of cosmic-comp,
