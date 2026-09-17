@@ -82,10 +82,12 @@ systemctl -q is-enabled NetworkManager-wait-online 2>/dev/null && warn boot "Net
 id -nG | tr ' ' '\n' | grep -qx docker && ok docker "in docker group" || warn docker "not in docker group (re-login after the first switch)"
 if [ -e /proc/driver/nvidia/version ]; then
   v=$(sed -n 's/.*Kernel Module  *\([0-9.]*\).*/\1/p' /proc/driver/nvidia/version | head -1)
-  case "$v" in
-    580.*) warn nvidia "pinned to $v for Xid 109 in 610.x; ikigai.nvidia.pin580 = false once a later branch is fixed" ;;
-    *) ok nvidia "$v" ;;
-  esac
+  ok nvidia "$v"
+fi
+if command -v steam >/dev/null; then
+  if [ ! -c /dev/ntsync ]; then warn ntsync "/dev/ntsync missing; rebuild with Steam enabled, or sudo modprobe ntsync for this boot"
+  elif [ ! -r /dev/ntsync ] || [ ! -w /dev/ntsync ]; then warn ntsync "/dev/ntsync is not readable and writable in this login"
+  else ok ntsync "device available; check lsof /dev/ntsync while a GE-Proton game runs to confirm use"; fi
 fi
 if command -v gamemoded >/dev/null; then
   if ! id -nG | tr ' ' '\n' | grep -qx gamemode; then warn gamemode "not in the gamemode group in this login: gamemoderun cannot renice until you log out and in"

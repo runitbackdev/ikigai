@@ -76,10 +76,22 @@ Claude Code's installer. nix-ld gives them the loader and a generous library lis
 
 ## NVIDIA
 
-`ikigai.gpu = "nvidia"` picks the driver. `ikigai.nvidia.pin580` (on by default) keeps
-`hardware.nvidia.package` on the `legacy_580` branch with the proprietary modules: the
-610.x open modules crash Proton games with Xid 109. `ikigai-doctor` nags while the pin is
-in. Sleep is set up (`hardware.nvidia.powerManagement.enable`): the driver keeps video
+`ikigai.gpu = "nvidia"` selects `nvidiaPackages.latest` with open kernel modules.
+`latest` follows the version in the flake's locked nixpkgs and advances with normal
+`ikigai-update`; `--no-pull` retains the locked version. Reboot after a driver change
+to load the matching kernel module. The `ikigai.nvidia.pin580` option has been removed;
+delete any explicit assignment to it from a personal flake before rebuilding.
+
+The earlier pin followed Xid 109 crashes, but the cited
+[Arch report](https://bbs.archlinux.org/viewtopic.php?id=313841) does not establish that
+open modules caused them: one 3090 user recovered by moving from 610.43.02 to 595.58.03
+while retaining open modules. Returning to latest is a test, not a confirmed fix for
+our crashes or display regressions. After a game session, check
+`journalctl -k -b | grep -i 'NVRM: Xid'`; no matches means no Xid was logged this boot,
+not proof that all GPU faults are gone. The previous NixOS generation remains available
+in the boot menu. `ikigai-doctor` reports the loaded version.
+
+Sleep is set up (`hardware.nvidia.powerManagement.enable`): the driver keeps video
 memory across suspend and its suspend, resume and hibernate services run, so the
 compositor wakes to a GPU that still has its state. Not yet seen on hardware; idle-suspend
 on AC stays off in the COSMIC config until it has.
@@ -88,9 +100,42 @@ on AC stays off in the COSMIC config until it has.
 
 Not installed by default. `ikigai.steam.enable = true` in the flake, then `ikigai-update`,
 puts Steam, the 32-bit driver, gamemode, gamescope, mangohud and Proton-GE on the box and
-you in the gamemode group. gamemode renices a game to -10, the one weight LAVD reads
-(its stock renice is 0), and turns split-lock throttling off while a game runs.
-`ikigai-steam` pins Steam to the rail and launches it. Proton comes with Steam.
+you in the gamemode group. `ikigai-steam` pins Steam to the rail and launches it.
+
+Stock Proton stays the default. Select GE-Proton per game under Properties >
+Compatibility when needed. Nix supplies GE through `extraCompatPackages`; normal
+`ikigai-update` updates it when the new nixpkgs input contains a newer package.
+`--no-pull` retains the locked version, and Steam's own updates do not update this GE
+package. Fully quit and restart Steam after rebuilding to discover the new tool path.
+The dropdown name stays `GE-Proton` across package updates.
+
+Steam-enabled systems load the `ntsync` kernel module at boot. GE uses it automatically
+when supported; selecting GE alone cannot load the module. On the reference box,
+loading it manually made the missing `/dev/ntsync` device available. Confirm use with
+`sudo lsof /dev/ntsync` while the game runs. If the device is absent, try
+`sudo modprobe ntsync`; if it exists but is unused, check the selected runner and device
+permissions. `ikigai-doctor` checks device availability and access, not whether a game
+is using it.
+
+Steam exports `MANGOHUD=1`, enabling the overlay for Vulkan games, including DXVK and
+vkd3d-proton. OpenGL games still need `mangohud %command%`. To disable the Vulkan overlay
+for one game, use `MANGOHUD=0 %command%`. MangoHud is available inside Steam's FHS
+environment as well as on the system.
+
+On NVIDIA, Steam also exports `__GL_SHADER_DISK_CACHE_SIZE=10737418240` (10 GiB).
+Cleanup stays enabled. This targets repeated shader compilation like that reported in
+[Steam issue 11392](https://github.com/ValveSoftware/steam-for-linux/issues/11392);
+its benefit on our box is unmeasured. Driver changes invalidate compiled shaders, so
+warm the cache before comparing sessions. Steam-enabled systems also set
+`vm.max_map_count=2147483642` to accommodate games with many mappings; this is a limit,
+not a RAM allocation. The existing zram sysctls remain in effect.
+
+gamemode stays per game: `gamemoderun %command%` renices a game to -10, a weight LAVD
+reads (gamemode's stock renice is 0), and turns split-lock throttling off while the game
+runs. Use it when builds compete with a game. gamescope also stays per game, for cursor,
+resolution or fullscreen fixes. LAVD stays in Auto mode without gamemode scheduler hooks.
+Compare frame-time logs and 1% lows with and without a build running; change one variable
+at a time. Driver stability and Overwatch DX11 versus DX12 still need hardware testing.
 
 ## Docker
 

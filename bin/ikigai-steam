@@ -13,9 +13,11 @@ fi
 if ! id -nG | tr ' ' '\n' | grep -qx gamemode; then
   echo "this login is not in the gamemode group: log out and back in before gamemoderun can renice"
 fi
+echo "MangoHud is enabled for Vulkan games."
+echo "GE-Proton is installed; select it in a game's Compatibility settings."
 echo "Launch options worth knowing:"
 echo "  gamemoderun %command%            nice -10 and the performance governor while the game runs"
-echo "  mangohud %command%               fps and hardware overlay"
+echo "  mangohud %command%               overlay for OpenGL games (Vulkan is automatic)"
 echo "  gamescope -f -- %command%        nested session: forced resolution, FSR, sane fullscreen"
 # Pin Steam to the rail, once. The shell watches shell.json, so this lands live.
 cfg="${XDG_CONFIG_HOME:-$HOME/.config}/ikigai/shell.json"

@@ -11,8 +11,24 @@ let
 in
 {
   config = lib.mkIf (cfg.enable && cfg.steam.enable) {
+    # GE can use ntsync automatically, but it cannot load the kernel module itself.
+    boot.kernelModules = [ "ntsync" ];
+    # Some games need more mappings than the kernel's default allows. No RAM is reserved.
+    boot.kernel.sysctl."vm.max_map_count" = 2147483642;
+
     programs.steam = {
       enable = true;
+      package = pkgs.steam.override {
+        extraEnv = {
+          MANGOHUD = "1";
+        }
+        // lib.optionalAttrs (cfg.gpu == "nvidia") {
+          # 10 GiB per driver cache; retain cleanup so caches remain bounded.
+          __GL_SHADER_DISK_CACHE_SIZE = "10737418240";
+        };
+      };
+      # Make the Vulkan overlay available inside Steam's FHS environment too.
+      extraPackages = [ pkgs.mangohud ];
       extraCompatPackages = [ pkgs.proton-ge-bin ];
       fontPackages = [ pkgs.liberation_ttf ];
     };

@@ -64,7 +64,7 @@ Edit `hosts/ikigai/default.nix` (user, GPU, hostname, timezone), rename
 never in the flake: `passwd` sets them.
 
 Settings live in that flake: `ikigai.user`, `ikigai.gpu`, `ikigai.theme`,
-`ikigai.steam.enable`, `ikigai.nvidia.pin580`, `ikigai.wifiCountry`. Edit, then
+`ikigai.steam.enable`, `ikigai.wifiCountry`. Edit, then
 `ikigai-update --no-pull`.
 
 The Arch path was retired on 2026-09-14. The NixOS install is under dogfooding: CI

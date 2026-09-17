@@ -61,15 +61,6 @@ in
       description = "The GPU vendor: picks the driver and, with Steam, its 32-bit half.";
     };
 
-    nvidia.pin580 = lib.mkOption {
-      type = lib.types.bool;
-      default = true;
-      description = ''
-        Stay on the 580 branch with the proprietary modules: the 610.x open modules crash
-        Proton games with Xid 109 (Arch bbs 313841). Off once a later branch is fixed.
-      '';
-    };
-
     wifiCountry = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;

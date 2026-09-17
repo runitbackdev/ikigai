@@ -96,7 +96,7 @@ nixpkgs catches up.
 A box is a personal flake in `/etc/nixos` (`templates/personal` is the shape). It imports
 `ikigai.nixosModules.ikigai`, sets `ikigai.enable` and `ikigai.user`, and the rest is
 defaults with an option each: `ikigai.gpu`, `ikigai.theme`, `ikigai.steam.enable`,
-`ikigai.nvidia.pin580`, `ikigai.wifiCountry`, `ikigai.flake`. The module
+`ikigai.wifiCountry`, `ikigai.flake`. The module
 (`nix/ikigai/`) is one file per concern:
 
 | File | |

@@ -27,7 +27,7 @@ let
 in
 {
   config = lib.mkIf cfg.enable {
-    # sched_ext needs 6.12 and NVIDIA's 580 branch builds on anything current.
+    # Use a current kernel for sched_ext and ntsync support.
     boot.kernelPackages = lib.mkDefault pkgs.linuxPackages_latest;
 
     # zram the size of RAM, zstd, before any disk swap; the resident limit caps what the
