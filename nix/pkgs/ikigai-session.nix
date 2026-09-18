@@ -11,7 +11,7 @@ rustPlatform.buildRustPackage {
   pname = "ikigai-session";
   version = "0.1.0";
   src = lib.cleanSource ../../session;
-  cargoHash = "sha256-9or4vt1dshsDWQjbO/PpOGG0+rd2XYpq8uSwdwSoUgA=";
+  cargoHash = "sha256-i9XeJQCyHdHjG4reKYgfeYpN9Ivfe+4X4iwEGZExPGI=";
 
   nativeBuildInputs = [ pkg-config ];
   buildInputs = [ libxkbcommon ];
