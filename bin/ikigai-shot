@@ -4,7 +4,8 @@
 # recording and stops it; `ikigai-shot text` reads a region with tesseract onto the
 # clipboard; `ikigai-shot color` picks a pixel as hex. The shell's picker when the Ikigai
 # shell offers one (with satty as its Edit action), else grim, slurp and
-# gpu-screen-recorder directly. `ikigai-shot ocr FILE` is the shell's Text action.
+# gpu-screen-recorder directly. `ikigai-shot keep FILE` and `ikigai-shot ocr FILE` are the
+# shell's Snip and Text actions; `ikigai-shot saved FILE` is its toast for a stopped recording.
 set -euo pipefail
 
 SHELL_QML=@shell@/shell.qml
@@ -21,10 +22,17 @@ color() {
 
 shell_has() { qs ipc -p "$SHELL_QML" show 2>/dev/null | grep -q "^target $1\$"; }
 
+# notify SUMMARY BODY [IMAGE]: a toast through the notification server, with the file as
+# its picture when given.
 notify() {
+  local hints=(0)
+  [ -n "${3:-}" ] && hints=(1 image-path s "$3")
   busctl --user -- call org.freedesktop.Notifications /org/freedesktop/Notifications \
-    org.freedesktop.Notifications Notify 'susssasa{sv}i' Ikigai 0 "" "$1" "$2" 0 0 4000 >/dev/null 2>&1 || true
+    org.freedesktop.Notifications Notify 'susssasa{sv}i' Ikigai 0 "" "$1" "$2" 0 "${hints[@]}" 4000 >/dev/null 2>&1 || true
 }
+
+# A path with $HOME as ~, for a toast.
+short() { case "$1" in "$HOME"/*) echo "~${1#"$HOME"}" ;; *) echo "$1" ;; esac; }
 
 # Text out of a PNG, to the clipboard, and a toast with the start of it.
 ocr() {
@@ -35,13 +43,18 @@ ocr() {
   notify "Text copied" "$(printf '%s' "$text" | head -c 160)"
 }
 
-# Clipboard and ~/Pictures/Screenshots, like the shell's picker does.
+# keep FILE: the PNG to the clipboard and ~/Pictures/Screenshots, and a toast saying so.
 keep() {
   local dir file
   dir="$(xdg-user-dir PICTURES)/Screenshots"; mkdir -p "$dir"
   file="$dir/$(date +%Y-%m-%d_%H-%M-%S).png"
-  tee "$file" | wl-copy --type image/png
+  cp "$1" "$file"
+  wl-copy --type image/png < "$file"
+  notify "Screenshot copied" "Also saved to $(short "$file")" "$file"
 }
+
+# A tmp PNG for grim, gone on exit.
+tmp() { tmp=$(mktemp --suffix=.png); trap 'rm -f "$tmp"' EXIT; }
 
 case "${1:-region}" in
   region)
@@ -49,24 +62,36 @@ case "${1:-region}" in
       exec qs ipc -p "$SHELL_QML" call shot region
     fi
     geometry=$(slurp -d -w 2 -b "#$(color surface 100e0d)b3" -c "#$(color primary 86adff)ff" -s "#00000000") || exit 0
-    grim -g "$geometry" - | keep
+    tmp; grim -g "$geometry" "$tmp" && keep "$tmp"
     ;;
   screen)
     if shell_has shot; then
       exec qs ipc -p "$SHELL_QML" call shot screen
     fi
-    grim - | keep
+    tmp; grim "$tmp" && keep "$tmp"
     ;;
   text)
     if shell_has shot; then
       exec qs ipc -p "$SHELL_QML" call shot text
     fi
     geometry=$(slurp -d -w 2 -b "#$(color surface 100e0d)b3" -c "#$(color primary 86adff)ff" -s "#00000000") || exit 0
-    tmp=$(mktemp --suffix=.png); trap 'rm -f "$tmp"' EXIT
-    grim -g "$geometry" "$tmp" && ocr "$tmp"
+    tmp; grim -g "$geometry" "$tmp" && ocr "$tmp"
+    ;;
+  keep)
+    keep "${2:?ikigai-shot keep FILE}"
     ;;
   ocr)
     ocr "${2:?ikigai-shot ocr FILE}"
+    ;;
+  saved)
+    file=${2:?ikigai-shot saved FILE}
+    if [ -f "$file" ]; then
+      printf '%s' "$file" | wl-copy
+      notify "Recording saved" "$(short "$file") is on the clipboard"
+    else
+      notify "Recording failed" "Nothing was written; see the shell's log"
+      exit 1
+    fi
     ;;
   color)
     if shell_has shot; then
@@ -84,10 +109,12 @@ case "${1:-region}" in
     if pkill -INT -x gpu-screen-recorder; then exit 0; fi
     geometry=$(slurp -w 2 -b "#$(color surface 100e0d)b3" -c "#$(color error ff716c)ff" -s "#00000000" -f '%wx%h+%x+%y') || exit 0
     dir="$(xdg-user-dir VIDEOS)/Recordings"; mkdir -p "$dir"
-    exec gpu-screen-recorder -w region -region "$geometry" -f 60 -a default_output -c mp4 -cursor yes -fallback-cpu-encoding yes -o "$dir/$(date +%Y-%m-%d_%H-%M-%S).mp4"
+    file="$dir/$(date +%Y-%m-%d_%H-%M-%S).mp4"
+    gpu-screen-recorder -w region -region "$geometry" -f 60 -a default_output -c mp4 -cursor yes -fallback-cpu-encoding yes -o "$file" || true
+    "$0" saved "$file"
     ;;
   *)
-    echo "usage: ikigai-shot [region|screen|text|color|record|ocr FILE]" >&2
+    echo "usage: ikigai-shot [region|screen|text|color|record|keep FILE|ocr FILE|saved FILE]" >&2
     exit 2
     ;;
 esac

@@ -6,8 +6,8 @@ import QtQuick
 // One screen recording at a time through gpu-screen-recorder: a rectangle on an output
 // (its KMS path, no compositor protocol involved) or a whole output, with the system's
 // audio, into ~/Videos/Recordings. Stopping saves the file and puts its path on the
-// clipboard. The shell only resolves the directory and execs the recorder, so the stop
-// signal reaches the recorder itself. The encoder is the GPU's when ffmpeg can drive it
+// clipboard with a toast saying so (`ikigai-shot saved`). The shell only resolves the
+// directory and execs the recorder, so the stop signal reaches the recorder itself. The encoder is the GPU's when ffmpeg can drive it
 // and x264 on the CPU when not (the NVIDIA 580xx pin's NVENC API is older than Arch's
 // ffmpeg wants); a recorder that exits without a file becomes a notification.
 Singleton {
@@ -62,7 +62,7 @@ Singleton {
         onExited: (code, status) => {
             console.info("record stopped", code, recorder.file);
             if (recorder.file)
-                Quickshell.execDetached(["sh", "-c", '[ -f "$0" ] && printf %s "$0" | wl-copy', recorder.file]);
+                Quickshell.execDetached(["ikigai-shot", "saved", recorder.file]);
         }
     }
 

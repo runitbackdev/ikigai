@@ -127,6 +127,7 @@ in
       gnugrep
       jq
       quickshell
+      systemd
       grim
       slurp
       wl-clipboard

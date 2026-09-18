@@ -81,14 +81,15 @@ a click picks a tile, its close button closes the window. Always on the primary 
 Snip, Edit, Text or Record. `Shift+Print` starts on Screen. Keys 1 to 4 pick the mode,
 Tab the action.
 
-- Snip: PNG to the clipboard and `~/Pictures/Screenshots`.
+- Snip: PNG to the clipboard and `~/Pictures/Screenshots`, and a toast with the capture and
+  its path.
 - Edit: the PNG in satty.
 - Text: the selection read by tesseract (English), the text on the clipboard and a toast
   with the start of it.
 - Color: a loupe over the frozen screen; a click puts the pixel's hex on the clipboard.
 - Record: gpu-screen-recorder with system audio, a dot and timer on the rail.
-  `Super+Shift+R` or a click on the dot stops it and puts the path (`~/Videos/Recordings`)
-  on the clipboard. x264 on the CPU when the GPU encoder is unavailable; a failure is a
+  `Super+Shift+R` or a click on the dot stops it, puts the path (`~/Videos/Recordings`)
+  on the clipboard and says so in a toast. x264 on the CPU when the GPU encoder is unavailable; a failure is a
   notification.
 
 `ikigai-shot region|screen|text|color|record` from a terminal. Without the shell it falls

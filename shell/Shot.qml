@@ -116,12 +116,6 @@ Scope {
         flash.restart();
     }
 
-    function fileName() {
-        const pad = n => (n < 10 ? "0" : "") + n;
-        const d = new Date();
-        return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + "_" + pad(d.getHours()) + "-" + pad(d.getMinutes()) + "-" + pad(d.getSeconds()) + ".png";
-    }
-
     // The overlay must be gone before the recorder starts, or it is in the recording.
     property var pendingRecord: null
 
@@ -149,7 +143,7 @@ Scope {
             else if (action === "text")
                 Apps.spawn(["sh", "-c", 'ikigai-shot ocr "$0"', path]);
             else
-                Apps.spawn(["sh", "-c", 'd="$(xdg-user-dir PICTURES)/Screenshots" && mkdir -p "$d" && cp "$0" "$d/$1" && wl-copy --type image/png < "$0"', path, fileName()]);
+                Apps.spawn(["sh", "-c", 'ikigai-shot keep "$0"', path]);
         }, Qt.size(Math.round(rect.width * dpr), Math.round(rect.height * dpr)));
         if (action === "snip" || action === "text") {
             flashing = true;
