@@ -74,6 +74,9 @@ in
         wantedBy = [ "graphical-session.target" ];
         partOf = [ "graphical-session.target" ];
         after = [ "graphical-session.target" ];
+        # graphical-session.target outlives a logout, so across a relogin the server aborts
+        # with no compositor until the next one is up; no start limit, or it stays dead.
+        startLimitIntervalSec = 0;
         environment = {
           XDG_CURRENT_DESKTOP = "Ikigai";
           QT_QPA_PLATFORM = "wayland";
