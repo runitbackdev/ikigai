@@ -8,12 +8,12 @@ cosmic-comp.overrideAttrs (finalAttrs: old: {
   version = "1.8.0-ikigai";
   src = fetchgit {
     url = "https://github.com/runitbackdev/cosmic-comp";
-    rev = "b56fc012ecbaa5c5c1976c45671a87a813abf858";
-    hash = "sha256-VeyRzzeUdIzA0VZNjdkDTg+x0+g5IQx/uxswjc8t+eM=";
+    rev = "c537a2313d62427c08e92f8170388e03b59bc306";
+    hash = "sha256-OrIM4aJePneZpZlw7Gq08UWW07sqaaPihENVIF7o08Q=";
   };
   cargoDeps = rustPlatform.fetchCargoVendor {
     inherit (finalAttrs) src;
-    hash = "sha256-SMyY4YCa7Zx+sfDGq4c35kngCMnU38f4Lq/4XcM3nZI=";
+    hash = "sha256-eEDI6UxW9AfYxh0RDr2leaF62FFrIWSPvEppGmUZ5EU=";
   };
   # Thin LTO, as Arch's package built it: fat LTO on the test binary takes more memory than
   # a CI runner has, and the runner dies mid-link.

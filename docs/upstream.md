@@ -8,7 +8,11 @@ What Ikigai works around that belongs in COSMIC, and what it would take to fix t
 Each entry: the symptom, where the workaround lives, the fix, and the size. Ordered by
 what a fork would earn first. Started 2026-09-13; every entry re-checked against epoch-1.8.0 of cosmic-comp,
 xdg-desktop-portal-cosmic and cosmic-settings-daemon (smithay e3d461a, cosmic-protocols
-32283d7) on 2026-09-13, which is what Arch ships and what the runitbackdev forks branch from.
+32283d7) on 2026-09-13, which is what Arch ships. The runitbackdev forks were rebased onto
+upstream master on 2026-09-18 (cosmic-comp 651f701f, smithay d3427dc4, cosmic-protocols
+c0cff4db, xdg-desktop-portal-cosmic 2f41161, cosmic-settings-daemon ac61900); nothing
+upstream since 1.8.0 touches an entry below, and the portal's handler and the daemon's
+greeter sync are unchanged at those revs.
 
 ## cosmic-comp
 
@@ -23,9 +27,9 @@ desktop named COSMIC because of the same bug, so its unit gets `XDG_CURRENT_DESK
 that stays, since Vicinae keys on the name, not on the bug. Upstream: cosmic-comp#1590 and
 smithay#1979, both open with no movement since 2026-03.
 
-Fixed on the fork, 2026-09-13: Smithay `dc10f06c` returns early from the `wlr_layer` and
+Fixed on the fork, 2026-09-13: Smithay `72b699d8` returns early from the `wlr_layer` and
 `session_lock` pre-commit hooks once the role object is dead, the check Drakulix named as
-acceptable in smithay#1979; cosmic-comp `fee768c8` pins it. `just comp-test` is the proof:
+acceptable in smithay#1979; cosmic-comp `e6708d47` pins it. `just comp-test` is the proof:
 stock Qt survives six hide/show cycles and two lock cycles under the fork and dies on the
 first of each under stock. Not sent upstream yet. The Qt rebuild is gone with it; Qt is nixpkgs' stock package.
 

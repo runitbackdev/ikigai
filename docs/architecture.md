@@ -46,7 +46,7 @@ into the user manager and starts `ikigai-session.target`. The units are
 | `vicinae` | `vicinae server`, wanted by `graphical-session.target`, with `XDG_CURRENT_DESKTOP=Ikigai` because Vicinae refuses layer-shell on anything called COSMIC |
 
 The bridge pins cosmic-protocols at the rev cosmic-comp's `Cargo.lock` resolves
-(`32283d7`). Toplevel manager v4; the legacy `move_to_workspace` is a no-op in comp.
+(`c0cff4db`). Toplevel manager v4; the legacy `move_to_workspace` is a no-op in comp.
 ext-workspace sends `id` only for pinned workspaces, so unpinned ones are keyed by
 Wayland object id.
 
