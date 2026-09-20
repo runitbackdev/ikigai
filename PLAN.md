@@ -9,13 +9,15 @@ cosmic-comp built into the `ikigai-desktop` Cachix cache. A box is a separate pe
 flake (`templates/personal`) that `ikigai-install` writes to `/etc/nixos`; `ikigai-migrate`
 turns an Arch box into one in place, kexec into the installer and the root emptied around
 the home. Left to verify on hardware: the ISO and `boot.ps1`
-boot, the installer's two modes, the greeter and session under the fork, NVIDIA's latest
+boot, the installer's two modes, the greeter and session under the fork, NVIDIA's production
 driver, `nix run .#vm`, and the cache once its key is pasted in.
 
 Gaming update, 2026-09-17: NVIDIA now uses `latest` with open modules; the `pin580`
 option is removed and previous NixOS generations provide rollback. The earlier Xid
 reports do not establish open modules as the cause, and latest still needs validation
-on hardware. With Steam enabled, load
+on hardware. 2026-09-20: latest failed that validation (610.57.04, eight Xid 109 in two
+days of Deadlock), so NVIDIA moved to `production` (595.x), open modules kept;
+docs/system.md has the evidence and the fallback. With Steam enabled, load
 ntsync, enable MangoHud for Vulkan games, set NVIDIA's shader-cache limit to 10 GiB with
 cleanup retained, and raise `vm.max_map_count`. Manually loading ntsync resolved the
 missing device on the reference box; performance gains remain unmeasured. Proton-GE

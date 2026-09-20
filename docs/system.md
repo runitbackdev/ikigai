@@ -76,17 +76,22 @@ Claude Code's installer. nix-ld gives them the loader and a generous library lis
 
 ## NVIDIA
 
-`ikigai.gpu = "nvidia"` selects `nvidiaPackages.latest` with open kernel modules.
-`latest` follows the version in the flake's locked nixpkgs and advances with normal
-`ikigai-update`; `--no-pull` retains the locked version. Reboot after a driver change
+`ikigai.gpu = "nvidia"` selects `nvidiaPackages.production` (595.x) with open kernel
+modules. `production` follows the version in the flake's locked nixpkgs and advances with
+normal `ikigai-update`; `--no-pull` retains the locked version. Reboot after a driver change
 to load the matching kernel module. The `ikigai.nvidia.pin580` option has been removed;
 delete any explicit assignment to it from a personal flake before rebuilding.
 
 The earlier pin followed Xid 109 crashes, but the cited
 [Arch report](https://bbs.archlinux.org/viewtopic.php?id=313841) does not establish that
 open modules caused them: one 3090 user recovered by moving from 610.43.02 to 595.58.03
-while retaining open modules. Returning to latest is a test, not a confirmed fix for
-our crashes or display regressions. After a game session, check
+while retaining open modules. The return to latest on 2026-09-17 was a test and it
+failed: 580.178.04 logged no Xid from 2026-09-14 to 2026-09-18, while 610.57.04 logged
+eight Xid 109 (CTX SWITCH TIMEOUT) in two days of Deadlock, with and without gamescope,
+and one of them took Xwayland down with it. Production is the next test, since 595 is
+what cured the 3090 in that report; if it hangs too, the known-good setup on our box is
+`legacy_580` with `open = false`. Try latest again once it has left the 610 branch.
+After a game session, check
 `journalctl -k -b | grep -i 'NVRM: Xid'`; no matches means no Xid was logged this boot,
 not proof that all GPU faults are gone. The previous NixOS generation remains available
 in the boot menu. `ikigai-doctor` reports the loaded version.
