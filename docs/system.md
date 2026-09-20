@@ -78,8 +78,9 @@ Claude Code's installer. nix-ld gives them the loader and a generous library lis
 
 `ikigai.gpu = "nvidia"` selects `nvidiaPackages.production` (595.x) with open kernel
 modules. `production` follows the version in the flake's locked nixpkgs and advances with
-normal `ikigai-update`; `--no-pull` retains the locked version. Reboot after a driver change
-to load the matching kernel module. The `ikigai.nvidia.pin580` option has been removed;
+normal `ikigai-update`; `--no-pull` retains the locked version. Take a driver change with
+`ikigai-update --boot` and reboot: a switch puts the new userspace on the old kernel
+module until then, and GPU clients started in between fall to llvmpipe. The `ikigai.nvidia.pin580` option has been removed;
 delete any explicit assignment to it from a personal flake before rebuilding.
 
 The earlier pin followed Xid 109 crashes, but the cited

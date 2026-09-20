@@ -5,20 +5,25 @@
 # log out.
 #   ikigai-update              inputs + rebuild
 #   ikigai-update --no-pull    rebuild from the inputs as locked
+#   ikigai-update --boot       build it for the next boot and leave the running system
+#                              alone; for a GPU driver change, where a switch puts the
+#                              new userspace on the old kernel module. Goes with --no-pull
 #   ikigai-update --check      show what would change, switch nothing
 #   ikigai-update --available  is there anything to update: exit 0 and what, or 1.
 #                              Fetches and locks into scratch, touches nothing
 set -euo pipefail
 
 FLAKE="${IKIGAI_FLAKE:-@flake@}"
-pull=1 check=0 available=0
-case "${1:-}" in
-  --no-pull) pull=0 ;;
-  --check) check=1 ;;
-  --available) available=1 ;;
-  "") ;;
-  *) sed -n '2,8p' "$0" >&2; exit 2 ;;
-esac
+pull=1 check=0 available=0 boot=0
+for arg in "$@"; do
+  case "$arg" in
+    --no-pull) pull=0 ;;
+    --boot) boot=1 ;;
+    --check) check=1 ;;
+    --available) available=1 ;;
+    *) sed -n '2,13p' "$0" >&2; exit 2 ;;
+  esac
+done
 
 [ -f "$FLAKE/flake.nix" ] || { echo "no flake at $FLAKE (IKIGAI_FLAKE, or ikigai.flake in the config)" >&2; exit 1; }
 
@@ -72,6 +77,15 @@ if [ "$check" = 1 ]; then
   nixos-rebuild build --flake "$FLAKE"
   nix store diff-closures /run/current-system ./result | head -60
   rm -f result
+  exit 0
+fi
+
+if [ "$boot" = 1 ]; then
+  echo "==> building for the next boot"
+  sudo nixos-rebuild boot --flake "$FLAKE"
+  after=$(readlink -f /nix/var/nix/profiles/system)
+  [ "$before" = "$after" ] || nix store diff-closures "$before" "$after" | head -40 || true
+  echo "done; reboot to use it"
   exit 0
 fi
 
