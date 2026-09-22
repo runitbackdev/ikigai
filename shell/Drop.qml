@@ -13,9 +13,16 @@ import Ikigai.Blobs
 //
 // Mapped at rest: creating the surface on open cost the first 150 ms of the drop, the
 // whole neck. Idle it draws nothing and takes no input.
+//
+// Except while no real screen exists. When every output drops off the bus at once (the
+// monitors' sleep on NVIDIA) the compositor closes the surface, and Quickshell closes
+// the window under it without noticing, so the card would never show again. Hidden
+// with the screens and shown again with them: the write to `visible` makes a new
+// surface on whatever screen is there, and the screen change moves it if need be.
 PanelWindow {
     id: window
     screen: Screens.focused
+    visible: Screens.focused !== null
 
     property bool open: false
     property int cardWidth: 770
