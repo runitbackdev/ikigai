@@ -8,6 +8,14 @@
   cosmic-settings,
   discord,
   pear-desktop,
+  # Discord decodes its streams in software; desktop.nix sets this on NVIDIA. There
+  # Chromium reads a decoded VA surface's dma-buf right after vaEndPicture with no sync,
+  # nvidia-vaapi-driver copies the frame in afterwards, and the stream judders at a steady
+  # 60 fps (8 vaSyncSurface calls for 2280 pictures, Electron 42). A driver patch that
+  # resolved the picture before vaEndPicture returned was carried until 2026-09-26;
+  # elFarto's answer on the issue was to keep the driver out of it, so
+  # LIBVA_DRIVER_NAME=none leaves Chromium to dav1d.
+  discordSoftwareDecode ? false,
 }:
 lib.hiPrio (
   runCommand "ikigai-cosmic-config" { } ''
@@ -27,6 +35,9 @@ lib.hiPrio (
       sed 's|^Exec=\([^ ]*\)|Exec=\1 --password-store=gnome-libsecret|' \
         "$entry" > "$out/share/applications/$(basename "$entry")"
     done
+    ${lib.optionalString discordSoftwareDecode ''
+      sed -i 's|^Exec=|Exec=env LIBVA_DRIVER_NAME=none |' $out/share/applications/discord.desktop
+    ''}
 
     install -m644 ${../../config/applications/mimeapps.list} $out/share/applications/mimeapps.list
     # The task manager, for Vicinae: the card, not a window.
