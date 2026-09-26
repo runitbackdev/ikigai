@@ -4,13 +4,6 @@
 final: prev: {
   cosmic-comp = final.callPackage ./cosmic-comp.nix { cosmic-comp = prev.cosmic-comp; };
 
-  # Chromium (Discord's streams) reads a decoded surface's dma-buf before the driver has
-  # copied the frame into it, and the picture judders at a steady 60 fps. The patch's
-  # header has the measurements.
-  nvidia-vaapi-driver = prev.nvidia-vaapi-driver.overrideAttrs (old: {
-    patches = (old.patches or [ ]) ++ [ ./nvidia-vaapi-driver-sync-held-exports.patch ];
-  });
-
   ikigai-session = final.callPackage ./ikigai-session.nix { };
   ikigai-monitor = final.callPackage ./ikigai-monitor.nix { };
   ikigai-shell-plugins = final.callPackage ./ikigai-shell-plugins.nix { };

@@ -73,6 +73,7 @@ Claude Code's installer. nix-ld gives them the loader and a generous library lis
 - Apple keyboards get F-keys on the F row (`hid_apple fnmode=2`).
 - Cosmic Files is pinned for folders so no other entry wins `inode/directory`.
 - Zen is the default for links and PDFs at the lowest XDG layer; Settings' Default Apps overrides it.
+- On NVIDIA, Discord's desktop entry runs it with `LIBVA_DRIVER_NAME=none`, so its streams decode in software (dav1d). Chromium reads a decoded VA surface's dma-buf before nvidia-vaapi-driver has copied the frame in, and the stream judders at a steady 60 fps; a driver patch carried until 2026-09-26 is gone, on elFarto's answer to the issue. Firefox and mpv keep hardware decode.
 
 ## NVIDIA
 

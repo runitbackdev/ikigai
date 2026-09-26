@@ -42,7 +42,7 @@ in
         ikigai-session
         ikigai-monitor
         ikigai-icons
-        ikigai-cosmic-config
+        (ikigai-cosmic-config.override { discordSoftwareDecode = cfg.gpu == "nvidia"; })
         cfg.themePackage
         adw-gtk3
         playerctl
