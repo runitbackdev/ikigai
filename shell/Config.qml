@@ -21,6 +21,11 @@ Singleton {
         file.writeAdapter();
     }
 
+    function setMonitor(name) {
+        config.monitor = name;
+        file.writeAdapter();
+    }
+
     function setDnd(on) {
         config.dnd = on;
         file.writeAdapter();

@@ -21,6 +21,18 @@ in
       }
       (lib.mkIf (cfg.gpu == "nvidia") {
         services.xserver.videoDrivers = [ "nvidia" ];
+        # The driver loads in the initrd, before any other GPU's can. The kernel numbers
+        # connectors (DP-2) in the order the drivers register them, and on a box with an
+        # iGPU as well that order is a race at boot: the same monitor was DP-2 one boot
+        # and DP-5 the next, and everything keyed on the name (cosmic-comp's saved layouts,
+        # its primary_output, shell.json's monitor) went to the wrong screen. Loaded first,
+        # the card's connectors are always DP-1 up.
+        boot.initrd.kernelModules = [
+          "nvidia"
+          "nvidia_modeset"
+          "nvidia_uvm"
+          "nvidia_drm"
+        ];
         hardware.nvidia = {
           modesetting.enable = true;
           open = true;

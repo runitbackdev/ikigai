@@ -6,9 +6,10 @@ import QtQuick
 
 // The primary screen: where the lock, polkit and welcome cards, the switcher and toasts
 // go, and where the sidebar opens from the command line. Wayland has no primary output,
-// so it is `monitor` in shell.json while that output is connected, else the first one the
-// compositor announced (which is whichever cable it enumerated first, not the one you
-// look at).
+// so it is `monitor` in shell.json while that output is connected, else the screen on the
+// same port (Ports.qml) when the compositor has named it differently this boot, in which
+// case `monitor` is rewritten to the new name, else the first one the compositor
+// announced (which is whichever cable it enumerated first, not the one you look at).
 //
 // Only real screens count. When every output drops off the bus at once (the monitors'
 // sleep on NVIDIA) Qt invents a nameless placeholder, and a layer surface bound to it is
@@ -30,8 +31,16 @@ Singleton {
         for (const s of real)
             if (s.name === Config.monitor)
                 return s;
+        for (const s of real)
+            if (port !== "" && Ports.id(s.name) === port)
+                return s;
         return real.length > 0 ? real[0] : null;
     }
+
+    // The primary's port, kept in ~/.local/state/ikigai/monitor-port so the screen can be
+    // found under another name next boot. Taken from the screen `monitor` names when it
+    // is there and Ports knows it.
+    property string port: ""
 
     // Where keyboard focus is: the screen of the activated window, else the primary. The
     // launcher opens there. Not the switcher: Windows' Alt+Tab is on the primary display
@@ -45,25 +54,70 @@ Singleton {
         return primary;
     }
 
-    // The greeter runs as its own user and cannot read shell.json, so the primary's name
-    // goes where it can look: /var/lib/ikigai/greeter/<user>, a sticky world-writable dir
-    // like /tmp (greeter/tmpfiles.conf). The compositor fork reads it as `primary_output`
-    // in its own config, the output a seat falls back to and moves to when it appears,
-    // so new windows land there after login and after the outputs wake. Both rewritten
-    // whenever `monitor` changes.
-    Process {
-        id: tell
-        command: ["sh", "-c", 'd=/var/lib/ikigai/greeter; [ -d "$d" ] && printf %s "$1" > "$d/$(id -un)"; c="${XDG_CONFIG_HOME:-$HOME/.config}/cosmic/com.system76.CosmicComp/v1"; mkdir -p "$c" && printf \'"%s"\' "$1" > "$c/primary_output"', "-", Config.monitor]
-        running: true
+    function sync() {
+        if (primary !== null) {
+            const id = Ports.id(primary.name);
+            if (primary.name === Config.monitor) {
+                if (id !== "")
+                    port = id;
+            } else if (id !== "" && id === port) {
+                console.info("screens", Config.monitor, "is", primary.name, "this boot");
+                Config.setMonitor(primary.name);
+                return;
+            }
+        }
+        const want = Config.monitor + "\n" + port;
+        if (want === told)
+            return;
+        told = want;
+        tell.running = false;
+        tell.running = true;
+    }
+
+    property string told: ""
+
+    // After the binding that raised it has settled: sync writes what primary reads.
+    onPrimaryChanged: {
+        if (primary !== null)
+            nudge();
+        Qt.callLater(sync);
     }
 
     Connections {
         target: Config
 
         function onMonitorChanged() {
-            tell.running = false;
-            tell.running = true;
+            Qt.callLater(screens.sync);
         }
+    }
+
+    Connections {
+        target: Ports
+
+        function onByNameChanged() {
+            Qt.callLater(screens.sync);
+        }
+    }
+
+    FileView {
+        path: Theme.stateDir + "/monitor-port"
+        printErrors: false
+        onLoaded: {
+            screens.port = text().trim();
+            Qt.callLater(screens.sync);
+        }
+        onLoadFailed: Qt.callLater(screens.sync)
+    }
+
+    // The greeter runs as its own user and cannot read shell.json, so the primary goes
+    // where it can look: /var/lib/ikigai/greeter/<user>, a sticky world-writable dir like
+    // /tmp (greeter/tmpfiles.conf), as its port when known, else its name. The compositor
+    // fork reads the name as `primary_output` in its own config, the output a seat falls
+    // back to and moves to when it appears, so new windows land there after login and
+    // after the outputs wake. All three rewritten whenever `monitor` or the port changes.
+    Process {
+        id: tell
+        command: ["sh", "-c", 'd=/var/lib/ikigai/greeter; [ -d "$d" ] && printf %s "${2:-$1}" > "$d/$(id -un)"; c="${XDG_CONFIG_HOME:-$HOME/.config}/cosmic/com.system76.CosmicComp/v1"; mkdir -p "$c" && printf \'"%s"\' "$1" > "$c/primary_output"; mkdir -p "$3" && printf %s "$2" > "$3/monitor-port"', "-", Config.monitor, screens.port, Theme.stateDir]
     }
 
     // cosmic-comp opens new windows on its active output, and the active output follows
@@ -73,11 +127,6 @@ Singleton {
     // focus wherever the compositor put it.
     function nudge() {
         settle.restart();
-    }
-
-    onPrimaryChanged: {
-        if (primary !== null)
-            nudge();
     }
 
     // Outputs return in a burst of two to three seconds; nudge once it is over.

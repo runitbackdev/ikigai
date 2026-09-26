@@ -5,14 +5,15 @@ import QtQuick
 
 // greetd's greeter, run by ikigai-greeter under cosmic-comp: the theme's wallpaper on
 // every screen and the login card on the last user's primary (their shell leaves its
-// name in /var/lib/ikigai/greeter), else the first screen the compositor lists.
+// port or name in /var/lib/ikigai/greeter; the port survives the compositor naming the
+// screen differently this boot, Ports.qml), else the first screen the compositor lists.
 ShellRoot {
     id: root
 
     readonly property var primary: {
         const screens = Quickshell.screens;
         for (let i = 0; i < screens.length; i++)
-            if (screens[i].name === Users.lastMonitor)
+            if (screens[i].name === Users.lastMonitor || Ports.id(screens[i].name) === Users.lastMonitor)
                 return screens[i];
         return screens.length > 0 ? screens[0] : null;
     }

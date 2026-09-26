@@ -20,6 +20,17 @@ waking is a hotplug; cosmic-comp's first page flip after the modeset fails, it f
 to 60 Hz in connector order and saves that. `ikigai-outputs` undoes that. A change made in
 Settings has no hotplug and sticks.
 
+The kernel names a connector (`DP-2`) by the order the drivers register it, and with an
+iGPU next to the card that order is a race at boot: the same monitor was `DP-2` one boot
+and `DP-5` the next (2026-09-26), and cosmic-comp's saved layouts, its `primary_output`
+and shell.json's `monitor` all went to the wrong screen. Two answers, as Windows has
+them. The NVIDIA driver loads in the initrd (`gpu.nix`), before the iGPU's can, so the
+card's connectors are always `DP-1` up. And the shell keys the primary on its port,
+`<GPU PCI address>/<type>/<place on that GPU>` (`shell/Ports.qml`), which does not move:
+when `monitor` names a screen that is not there and one on the remembered port is, the
+shell takes it and rewrites `monitor`. The EDID is no help alone; both of this box's
+monitors report serial 0.
+
 ## Memory
 
 zram the size of RAM, zstd, before any disk swap (`services.zram-generator`), with a
