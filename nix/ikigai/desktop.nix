@@ -62,6 +62,7 @@ in
 
     services.graphical-desktop.enable = true;
     services.displayManager.sessionPackages = [ pkgs.ikigai-session ];
+    services.flatpak.enable = true;
 
     xdg = {
       sounds.enable = true;
