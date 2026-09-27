@@ -125,11 +125,20 @@ in
     # Zen reads /etc/zen/policies instead of its package's, so the trust-store policy the
     # flake's package ships is repeated here. Firefox's own middle-click autoscroll stays
     # off: the compositor does it, and a middle click that reaches Zen must stay a click.
+    # KeePassXC-Browser is installed from AMO by policy; the home module links the native
+    # messaging manifest it talks through and starts KeePassXC with the session. Zen's own
+    # password manager is off, or both would offer to save every new login.
     environment.etc."zen/policies/policies.json".text = builtins.toJSON {
       policies = {
         DisableAppUpdate = true;
         DefaultSerialGuardSetting = 3;
         SecurityDevices."System Trust" = "${pkgs.p11-kit}/lib/pkcs11/p11-kit-trust.so";
+        PasswordManagerEnabled = false;
+        OfferToSaveLogins = false;
+        ExtensionSettings."keepassxc-browser@keepassxc.org" = {
+          installation_mode = "force_installed";
+          install_url = "https://addons.mozilla.org/firefox/downloads/latest/keepassxc-browser/latest.xpi";
+        };
       };
     };
   };

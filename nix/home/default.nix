@@ -236,15 +236,39 @@ in
     xdg.configFile."gamemode.ini".source = (seeds + "/gamemode/gamemode.ini");
     xdg.dataFile."vicinae/themes/${themeName}.toml".source = "${t}/vicinae/${themeName}.toml";
 
+    # ---- passwords and passkeys ----------------------------------------------------
+    # KeePassXC starts with the session into the tray (xdg-desktop-autostart.target, which
+    # ikigai-session.target wants) and answers KeePassXC-Browser in Zen over native
+    # messaging: the manifest goes where Zen keeps its user data, ~/.config/zen, and the
+    # extension itself is force-installed by the Zen policy in nix/ikigai/desktop.nix. The
+    # ini is seeded once, since the app writes it back; UpdateBinaryPath is off so it does
+    # not try to install a manifest of its own under ~/.mozilla. Every save first copies the
+    # database into the state dir, one copy a day; SSH keys kept in the vault reach gcr's
+    # agent while it is unlocked.
+    programs.keepassxc = {
+      enable = true;
+      autostart = true;
+    };
+    xdg.autostart.enable = true;
+    xdg.configFile."zen/native-messaging-hosts/org.keepassxc.keepassxc_browser.json".source =
+      "${pkgs.keepassxc}/lib/mozilla/native-messaging-hosts/org.keepassxc.keepassxc_browser.json";
+
     # ---- the shell's own files -----------------------------------------------------
     # The shell watches shell-theme.json for the palette; shell.json is its config, which
     # the rail writes back (pin, unpin), so it is seeded once. btop and Vicinae rewrite
     # their files too.
     home.file.".local/state/ikigai/shell-theme.json".source = "${t}/shell.json";
     home.activation = {
-      ikigaiShellConfig = seedOnce "${config.xdg.configHome}/ikigai/shell.json" (seeds + "/ikigai/shell.json");
+      ikigaiShellConfig = seedOnce "${config.xdg.configHome}/ikigai/shell.json" (
+        seeds + "/ikigai/shell.json"
+      );
       ikigaiBtopConfig = seedOnce "${config.xdg.configHome}/btop/btop.conf" (seeds + "/btop/btop.conf");
-      ikigaiVicinaeConfig = seedOnce "${config.xdg.configHome}/vicinae/settings.json" (seeds + "/vicinae/settings.json");
+      ikigaiVicinaeConfig = seedOnce "${config.xdg.configHome}/vicinae/settings.json" (
+        seeds + "/vicinae/settings.json"
+      );
+      ikigaiKeepassxcConfig = seedOnce "${config.xdg.configHome}/keepassxc/keepassxc.ini" (
+        pkgs.replaceVars (seeds + "/keepassxc/keepassxc.ini") { stateHome = config.xdg.stateHome; }
+      );
       # A user-layer COSMIC theme (written by Settings) would shadow the system one.
       ikigaiCosmicTheme = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         for f in com.system76.CosmicTheme.Dark com.system76.CosmicTheme.Dark.Builder; do

@@ -12,6 +12,19 @@ the login password. Zen, Zed, gh, Vicinae and the Chromium apps
 agent is gcr's; `SSH_AUTH_SOCK` is set by the session, passphrases land in the same
 keyring.
 
+Passwords and passkeys are KeePassXC's, one `.kdbx` of your own. It starts with the
+session into the tray (XDG autostart, from the home module) and Zen's KeePassXC-Browser,
+installed by the policy in `desktop.nix`, reaches it over native messaging through the
+manifest linked into `~/.config/zen/native-messaging-hosts`, which is where this Zen keeps
+its user data. A passkey is an entry in the database like a password, so syncing the file
+(Syncthing, a drive) carries both to KeePassDX or Strongbox on a phone. The ini is seeded
+once (`config/keepassxc`), then KeePassXC's own. The seed turns on browser integration,
+the tray, start minimized, the SSH agent (keys in the vault reach gcr's agent while it is
+unlocked) and a copy of the database before every save, one a day, under
+`~/.local/state/keepassxc/backup`; its theme is `classic`, so it takes the Qt palette like
+every other Qt app. Zen's own password manager is off by policy, so only KeePassXC offers
+to save a login.
+
 ## Displays
 
 `ikigai-outputs` remembers each layout that has sat still and puts it back when the same
