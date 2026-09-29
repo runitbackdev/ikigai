@@ -77,16 +77,17 @@ once, every install compiles the compositor, the session crate and the shell plu
 
 ## The forks
 
-cosmic-comp and Smithay live at github.com/runitbackdev, branch `ikigai`, cut from upstream
-master plus one commit per fix ([upstream.md](upstream.md)); cosmic-protocols,
-xdg-desktop-portal-cosmic and cosmic-settings-daemon are mirrors there with no patches. To
-take a new upstream: fetch it, rebase the `ikigai` branch onto it (Smithay first, since
-cosmic-comp's first commit pins the Smithay fork's rev), `cargo check`, push, then bump the
-package as below. `nix/pkgs/cosmic-comp.nix` is
+cosmic-comp lives at github.com/runitbackdev, branch `ikigai`, cut from upstream master plus
+one commit per fix ([upstream.md](upstream.md)); its first commit pins upstream Smithay
+master. smithay, cosmic-protocols, xdg-desktop-portal-cosmic and cosmic-settings-daemon are
+mirrors there with no patches (the Smithay fix went upstream as smithay#2174, 2026-09-21). To
+take a new upstream: fetch it, rebase the `ikigai` branch onto it, move the Smithay rev in
+`Cargo.toml` and `cargo update -p smithay`, `cargo check`, push, then bump the package as
+below. `nix/pkgs/cosmic-comp.nix` is
 nixpkgs' package with the fork's source. To ship a change: commit on the fork, push, put
 the new `rev`, `hash` and `cargoHash` in that file (`nix build .#cosmic-comp` reports each
 mismatch in turn), and merge to main; CI builds it into the cache, `ikigai-update`
-installs it. A Smithay change goes through cosmic-comp's `Cargo.toml` the same way. Test
+installs it. A Smithay bump goes through cosmic-comp's `Cargo.toml` the same way. Test
 it first with `just comp-test $(nix build --print-out-paths .#cosmic-comp)/bin/cosmic-comp`.
 
 nixpkgs ships the other COSMIC components at epoch 1.6.0 while the fork is past 1.8.0. A

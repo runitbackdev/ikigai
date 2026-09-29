@@ -1,7 +1,7 @@
 # Upstream
 
-Ikigai maintains its AI-assisted patches downstream; no upstream submissions are
-planned. See the [fork policy and maintenance decision](review-2026-09.md#fork-policy-and-maintenance).
+Ikigai maintains its AI-assisted patches downstream; the Smithay destroyed-role guard is the
+one sent so far, merged as smithay#2174 on 2026-09-21. See the [fork policy and maintenance decision](review-2026-09.md#fork-policy-and-maintenance).
 The technical notes below describe dependencies and workarounds, not a submission roadmap.
 
 What Ikigai works around that belongs in COSMIC, and what it would take to fix there.
@@ -12,7 +12,10 @@ xdg-desktop-portal-cosmic and cosmic-settings-daemon (smithay e3d461a, cosmic-pr
 upstream master on 2026-09-18 (cosmic-comp 651f701f, smithay d3427dc4, cosmic-protocols
 c0cff4db, xdg-desktop-portal-cosmic 2f41161, cosmic-settings-daemon ac61900); nothing
 upstream since 1.8.0 touches an entry below, and the portal's handler and the daemon's
-greeter sync are unchanged at those revs.
+greeter sync are unchanged at those revs. Rebased again on 2026-09-29 (cosmic-comp 9f746ea3,
+smithay 3b133491 upstream, cosmic-protocols c0cff4db unchanged, xdg-desktop-portal-cosmic
+38ddd40b, cosmic-settings-daemon f22461b1): of the ten cosmic-comp commits only 50c170c3
+touches a fork commit, see the autoscroll entry; the Smithay fork is a plain mirror now.
 
 ## cosmic-comp
 
@@ -24,14 +27,16 @@ answers the commit with a protocol error, so every Qt layer-shell client died th
 time it hid a window. Until 2026-09-14 Ikigai carried a patched `libQt6WaylandClient.so`,
 rebuilt by a pacman hook on every qt6-base upgrade. Vicinae turns layer-shell off on any
 desktop named COSMIC because of the same bug, so its unit gets `XDG_CURRENT_DESKTOP=Ikigai`;
-that stays, since Vicinae keys on the name, not on the bug. Upstream: cosmic-comp#1590 and
-smithay#1979, both open with no movement since 2026-03.
+that stays, since Vicinae keys on the name, not on the bug. Upstream: smithay#1979 closed on
+2026-09-21 by Ikigai's smithay#2174; cosmic-comp#1590 is still open.
 
-Fixed on the fork, 2026-09-13: Smithay `72b699d8` returns early from the `wlr_layer` and
-`session_lock` pre-commit hooks once the role object is dead, the check Drakulix named as
-acceptable in smithay#1979; cosmic-comp `e6708d47` pins it. `just comp-test` is the proof:
+Fixed on the fork 2026-09-13 and upstream 2026-09-21: Smithay returns early from the
+`wlr_layer` and `session_lock` pre-commit hooks once the role object is dead, the check
+Drakulix named as acceptable in smithay#1979 (`72b699d8` on the fork, `ed563d93` upstream as
+smithay#2174). Since 2026-09-29 cosmic-comp's first fork commit pins upstream Smithay master
+and the runitbackdev/smithay fork carries nothing. `just comp-test` is the proof:
 stock Qt survives six hide/show cycles and two lock cycles under the fork and dies on the
-first of each under stock. Not sent upstream yet. The Qt rebuild is gone with it; Qt is nixpkgs' stock package.
+first of each under stock. The Qt rebuild is gone with it; Qt is nixpkgs' stock package.
 
 ### `set_focus` ignores exclusive layer surfaces for one frame
 
@@ -125,8 +130,10 @@ with the client keeping focus as under an implicit grab, and the cursor is one o
 shapes loaded by name (`pan-all`, `pan-n`, `pan-ne`, ...) with the resize arrows and
 `all-scroll` as fallbacks (`CursorShape` in `backend/render/cursor.rs`). Windows with an
 active pointer constraint, app ids in `exclude`, and presses with Super held are passed
-through. Ikigai draws the pan cursors (`cursors/ikigai`: its own origin ring, Bibata's arrow turned eight ways). Not sent upstream yet; a
-feature, not a fix, and the config key would want a Settings page.
+through. Escape ends one: upstream `50c170c3` (2026-09) cancels only the grabs it
+recognises by type, and `AutoscrollGrab` is on that list. Ikigai draws the pan cursors
+(`cursors/ikigai`: its own origin ring, Bibata's arrow turned eight ways). Not sent upstream
+yet; a feature, not a fix, and the config key would want a Settings page.
 
 ### A layer surface with no output goes to the pointer's monitor
 
