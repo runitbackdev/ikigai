@@ -33,7 +33,7 @@ Singleton {
             return;
         const dpr = screen.devicePixelRatio;
         const source = rect
-            ? ["-w", "region", "-region", Math.round(rect.width * dpr) + "x" + Math.round(rect.height * dpr) + "+" + Math.round((screen.x + rect.x) * dpr) + "+" + Math.round((screen.y + rect.y) * dpr)]
+            ? ["-w", Math.round(rect.width * dpr) + "x" + Math.round(rect.height * dpr) + "+" + Math.round((screen.x + rect.x) * dpr) + "+" + Math.round((screen.y + rect.y) * dpr)]
             : ["-w", screen.name];
         console.info("record start", source.join(" "));
         file = "";

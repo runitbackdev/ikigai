@@ -68,6 +68,7 @@
       packages.${system} = {
         inherit (pkgs)
           cosmic-comp
+          gpu-screen-recorder
           ikigai-session
           ikigai-monitor
           ikigai-shell
@@ -128,6 +129,7 @@
         example = self.nixosConfigurations.example.config.system.build.toplevel;
         inherit (self.packages.${system})
           cosmic-comp
+          gpu-screen-recorder
           ikigai-session
           ikigai-monitor
           ikigai-shell

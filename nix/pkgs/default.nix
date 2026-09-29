@@ -1,8 +1,9 @@
-# The overlay: Ikigai's own packages, the compositor fork in place of nixpkgs' cosmic-comp,
+# The overlay: Ikigai's own packages, the compositor fork and a patched recorder in place of nixpkgs' own,
 # and the names the rest of the tree uses (`zen`, `zed`) for packages nixpkgs names otherwise.
 { inputs }:
 final: prev: {
   cosmic-comp = final.callPackage ./cosmic-comp.nix { cosmic-comp = prev.cosmic-comp; };
+  gpu-screen-recorder = final.callPackage ./gpu-screen-recorder.nix { gpu-screen-recorder = prev.gpu-screen-recorder; };
 
   ikigai-session = final.callPackage ./ikigai-session.nix { };
   ikigai-monitor = final.callPackage ./ikigai-monitor.nix { };
