@@ -95,6 +95,7 @@ in
   };
   ikigai-greeter = mkCommand "ikigai-greeter" {
     runtimeInputs = [
+      coreutils
       cosmic-comp
       quickshell
       systemd
