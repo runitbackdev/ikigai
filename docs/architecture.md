@@ -63,6 +63,13 @@ AccountsService, the last user and their primary screen from
 `/var/lib/ikigai/greeter/<user>`, which the shell writes. On success cosmic-comp exits
 and greetd starts the session. The command is `bin/ikigai-greeter`.
 
+cosmic-comp exits at once when it starts with no screen, and greetd exits with its
+greeter. At power-on a DisplayPort monitor can still be waking when the driver is up, so
+the greeter waits up to 15 s for a connected connector before starting cosmic-comp, and
+greetd is restarted when it fails (2 s apart, ten tries in two minutes) instead of only
+after a clean exit, as NixOS has it. A greeter that never comes up says why in
+`journalctl -b -t ikigai-greeter`, and greetd in `journalctl -b -u greetd`.
+
 ## Lock and polkit
 
 The shell draws ext-session-lock surfaces on every screen and checks the password through

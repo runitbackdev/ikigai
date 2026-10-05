@@ -4,6 +4,16 @@
 # greetd discards the greeter's output; send it to the journal instead. The theme and the
 # cursors are read from the system profile, where every theme package puts them.
 exec > >(systemd-cat -t ikigai-greeter) 2>&1
+# At power-on a DisplayPort monitor can still be waking when the driver is up, and its
+# connector reads disconnected for a few seconds. cosmic-comp started then finds no output
+# and exits ("Backend initialized without output"); wait up to 15 s for a screen first.
+for ((tries = 0; tries < 30; tries++)); do
+  for status in /sys/class/drm/card*-*/status; do
+    [ -r "$status" ] && [ "$(<"$status")" = connected ] && break 2
+  done
+  ((tries == 0)) && echo "ikigai-greeter: no screen connected yet, waiting"
+  sleep 0.5
+done
 export QT_QPA_PLATFORM=wayland QT_QPA_PLATFORMTHEME='' QS_DISABLE_FILE_WATCHER=1
 export QML_IMPORT_PATH=@qml@
 export IKIGAI_THEME_FILE=/run/current-system/sw/share/ikigai/theme/shell.json

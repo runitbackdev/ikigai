@@ -19,6 +19,17 @@ in
         user = "ikigai-greeter";
       };
     };
+    # greetd exits when its greeter dies without starting a session, and NixOS restarts it
+    # only after a clean exit: a greeter that failed at boot left a black screen until a
+    # reboot. Restart it, a few times, and leave the journal to say why if it keeps dying.
+    systemd.services.greetd = {
+      serviceConfig = {
+        Restart = lib.mkForce "always";
+        RestartSec = "2s";
+      };
+      startLimitIntervalSec = 120;
+      startLimitBurst = 10;
+    };
     security.pam.services.greetd.enableGnomeKeyring = true;
 
     users.groups.ikigai-greeter = { };
