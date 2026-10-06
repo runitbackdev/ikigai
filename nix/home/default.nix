@@ -239,10 +239,12 @@ in
     # ---- passwords and passkeys ----------------------------------------------------
     # KeePassXC starts with the session into the tray (xdg-desktop-autostart.target, which
     # ikigai-session.target wants) and answers KeePassXC-Browser in Zen over native
-    # messaging: the manifest goes where Zen keeps its user data, ~/.config/zen, and the
-    # extension itself is force-installed by the Zen policy in nix/ikigai/desktop.nix. The
-    # ini is seeded once, since the app writes it back; UpdateBinaryPath is off so it does
-    # not try to install a manifest of its own under ~/.mozilla. Every save first copies the
+    # messaging: the manifest goes in ~/.mozilla/native-messaging-hosts, where Gecko looks
+    # for per-user hosts whatever the profile dir (Zen's is ~/.config/zen, which it never
+    # reads hosts from), and the extension itself is force-installed by the Zen policy in
+    # nix/ikigai/desktop.nix. The ini is seeded once, since the app writes it back;
+    # UpdateBinaryPath is off so it does not overwrite the linked manifest with one of its
+    # own pointing at a store path that a later switch collects. Every save first copies the
     # database into the state dir, one copy a day; SSH keys kept in the vault reach gcr's
     # agent while it is unlocked.
     programs.keepassxc = {
@@ -250,7 +252,7 @@ in
       autostart = true;
     };
     xdg.autostart.enable = true;
-    xdg.configFile."zen/native-messaging-hosts/org.keepassxc.keepassxc_browser.json".source =
+    home.file.".mozilla/native-messaging-hosts/org.keepassxc.keepassxc_browser.json".source =
       "${pkgs.keepassxc}/lib/mozilla/native-messaging-hosts/org.keepassxc.keepassxc_browser.json";
 
     # ---- the shell's own files -----------------------------------------------------

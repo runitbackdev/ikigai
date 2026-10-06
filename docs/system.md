@@ -15,8 +15,8 @@ keyring.
 Passwords and passkeys are KeePassXC's, one `.kdbx` of your own. It starts with the
 session into the tray (XDG autostart, from the home module) and Zen's KeePassXC-Browser,
 installed by the policy in `desktop.nix`, reaches it over native messaging through the
-manifest linked into `~/.config/zen/native-messaging-hosts`, which is where this Zen keeps
-its user data. A passkey is an entry in the database like a password, so syncing the file
+manifest linked into `~/.mozilla/native-messaging-hosts`, where Gecko looks for per-user
+hosts even though this Zen keeps its profiles in `~/.config/zen`. A passkey is an entry in the database like a password, so syncing the file
 (Syncthing, a drive) carries both to KeePassDX or Strongbox on a phone. The ini is seeded
 once (`config/keepassxc`), then KeePassXC's own. The seed turns on browser integration,
 the tray, start minimized, the SSH agent (keys in the vault reach gcr's agent while it is
