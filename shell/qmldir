@@ -1,6 +1,7 @@
 singleton Theme 1.0 Theme.qml
 singleton Config 1.0 Config.qml
 singleton Screens 1.0 Screens.qml
+singleton Ports 1.0 Ports.qml
 singleton Motion 1.0 Motion.qml
 singleton Bridge 1.0 Bridge.qml
 singleton Tasks 1.0 Tasks.qml
