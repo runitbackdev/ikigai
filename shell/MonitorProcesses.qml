@@ -4,12 +4,15 @@ import QtQuick
 // The Processes page: apps first, each a row with its processes folded under a caret and
 // its numbers summed, then every other process flat under Background processes. Columns
 // sort on a click, the sort sticks while the card is up, and rows keep their place as
-// numbers change. Typing searches by name or PID; Delete ends the selected task, Shift
-// with it force-stops. The cell tint is the heat map: the more a cell uses, the deeper.
+// numbers change: only a new sort or a row coming or going moves anything. Typing searches
+// by name, binary, command line or PID and picks the first hit; Delete ends the selected
+// task, Shift with it force-stops. The cell tint is the heat map: the more a cell uses, the
+// deeper.
 //
 // An app is a window's app id, matched to processes by the binary its desktop entry runs
 // (Magpie's own grouping knows nothing of Nix wrappers), plus every descendant of those
-// processes that is not itself another app's root.
+// processes that is not itself another app's root. A Steam game's window says only
+// steam_app_N, so its root is the reaper Steam started with AppId=N.
 FocusScope {
     id: page
 
@@ -20,6 +23,9 @@ FocusScope {
     property var expanded: ({})
     property string selected: ""
     property var rows: []
+    // Where each row sat last time, by key, and under which sort.
+    property var placed: new Map()
+    property string placedBy: ""
 
     signal terminate(var pids)
     signal kill(var pids)
@@ -35,11 +41,24 @@ FocusScope {
     ]
     readonly property var selectedRow: rows.find(r => r.key === selected) || null
 
-    onSampleChanged: rebuild()
-    onSearchChanged: rebuild()
+    // Hidden, the page skips the ticks and catches up when it shows.
+    onSampleChanged: if (visible) rebuild()
+    onVisibleChanged: if (visible) rebuild()
+    onSearchChanged: {
+        // A group closed by hand stays closed only for the search that opened it.
+        const open = Object.keys(expanded).filter(k => expanded[k]);
+        if (open.length < Object.keys(expanded).length)
+            expanded = Object.fromEntries(open.map(k => [k, true]));
+        else
+            rebuild();
+    }
     onSortKeyChanged: rebuild()
     onSortDescChanged: rebuild()
     onExpandedChanged: rebuild()
+
+    // What a desktop entry may run its app through. Matching on these would claim every
+    // other process that runs one, so such an entry matches by its app id alone.
+    readonly property var launchers: ["sh", "bash", "zsh", "dash", "env", "flatpak", "steam", "gtk-launch", "xdg-open", "systemd-run", "uwsm", "app2unit", "gamemoderun", "prime-run", "nixgl"]
 
     function baseName(path) {
         return path ? path.slice(path.lastIndexOf("/") + 1) : "";
@@ -74,14 +93,22 @@ FocusScope {
         const apps = [];
         const seen = new Set();
         for (const w of Bridge.windows) {
-            if (seen.has(w.appId))
+            if (!w.appId || seen.has(w.appId))
                 continue;
             seen.add(w.appId);
+            const game = /^steam_app_(\d+)$/.exec(w.appId);
+            if (game) {
+                const launch = new RegExp("\\bAppId=" + game[1] + "\\b");
+                const roots = sample.processes.filter(p => launch.test(p.cmd)).map(p => p.pid);
+                apps.push({ id: "app:" + w.appId, name: w.title || w.appId, glyph: "game-controller", candidates: [], roots: roots });
+                continue;
+            }
             const entry = Apps.entryFor(w.appId);
             const candidates = [w.appId.toLowerCase(), Apps.short(w.appId)];
             if (entry) {
-                if (entry.command.length > 0)
-                    candidates.push(baseName(entry.command[0]).toLowerCase());
+                const program = entry.command.length > 0 ? baseName(entry.command[0]).toLowerCase() : "";
+                if (program && !launchers.includes(program))
+                    candidates.push(program);
                 if (entry.startupClass)
                     candidates.push(entry.startupClass.toLowerCase());
             }
@@ -123,11 +150,12 @@ FocusScope {
         return { byPid: byPid, groups: groups, background: background };
     }
 
+    // Store paths are dropped from the haystack, or "nix" would match every process.
     function processRow(p, depth) {
         return {
             key: "pid:" + p.pid, kind: "process", depth: depth, glyph: "", pid: p.pid, name: p.name,
             cpu: p.cpu, memory: p.memory, gpu: p.gpu, gpuMemory: p.gpuMemory, pids: [p.pid], count: 1,
-            detail: p.cmd || p.name, state: p.state
+            detail: p.cmd || p.name, state: p.state, find: [p.name, p.exe, p.argv0, p.cmd].join("\n").replace(/\/nix\/store\/[^/\s]+/g, "").toLowerCase()
         };
     }
 
@@ -143,6 +171,22 @@ FocusScope {
         return sortDesc ? -d : d;
     }
 
+    // Sorts siblings, but rows already on screen keep last time's order and new ones go in
+    // where the sort puts them, so nothing moves under the pointer as numbers change.
+    function settle(list) {
+        list.sort(compare);
+        if (placedBy !== sortKey + (sortDesc ? "-" : "+"))
+            return list;
+        const kept = list.filter(r => placed.has(r.key)).sort((a, b) => placed.get(a.key) - placed.get(b.key));
+        for (const r of list) {
+            if (placed.has(r.key))
+                continue;
+            const i = kept.findIndex(k => compare(r, k) < 0);
+            kept.splice(i < 0 ? kept.length : i, 0, r);
+        }
+        return kept;
+    }
+
     function rebuild() {
         if (!sample) {
             rows = [];
@@ -150,7 +194,7 @@ FocusScope {
         }
         const g = group(sample);
         const needle = search.trim().toLowerCase();
-        const hit = r => !needle || r.name.toLowerCase().includes(needle) || String(r.pid).includes(needle);
+        const hit = r => !needle || r.find.includes(needle) || String(r.pid).includes(needle);
         const out = [];
 
         const appRows = [];
@@ -165,38 +209,43 @@ FocusScope {
                 key: grp.id, kind: "group", depth: 0, glyph: grp.glyph, pid: all[0].pid, name: grp.name,
                 cpu: sum("cpu"), memory: sum("memory"), gpu: sum("gpu"), gpuMemory: sum("gpuMemory"),
                 pids: grp.pids, count: all.length, detail: all.length + (all.length === 1 ? " process" : " processes"),
-                expanded: !!expanded[grp.id] || (needle && !own)
+                expanded: expanded[grp.id] ?? (!!needle && !own)
             };
-            row.children = row.expanded ? (own ? grp.pids.map(pid => processRow(g.byPid.get(pid), 1)) : members).sort(compare) : [];
+            row.children = row.expanded ? settle(own ? grp.pids.map(pid => processRow(g.byPid.get(pid), 1)) : members) : [];
             appRows.push(row);
         }
-        appRows.sort(compare);
         if (appRows.length > 0) {
             out.push({ key: "section:apps", kind: "section", name: "Apps", count: appRows.length, pid: 0 });
-            for (const r of appRows) {
+            for (const r of settle(appRows)) {
                 out.push(r);
                 for (const c of r.children)
                     out.push(c);
             }
         }
 
-        const back = g.background.map(p => processRow(p, 0)).filter(hit).sort(compare);
+        const back = settle(g.background.map(p => processRow(p, 0)).filter(hit));
         if (back.length > 0) {
             out.push({ key: "section:background", kind: "section", name: "Background processes", count: back.length, pid: 0 });
             for (const r of back)
                 out.push(r);
         }
+        placed = new Map(out.map((r, i) => [r.key, i]));
+        placedBy = sortKey + (sortDesc ? "-" : "+");
         rows = out;
         if (selected && !out.some(r => r.key === selected))
             selected = "";
+        if (needle && !selected) {
+            const first = out.find(r => r.kind !== "section");
+            if (first)
+                selected = first.key;
+        }
     }
 
+    // Stored either way, so a group the search opened can be closed while it lasts.
     function toggleGroup(key) {
+        const row = rows.find(r => r.key === key);
         const e = Object.assign({}, expanded);
-        if (e[key])
-            delete e[key];
-        else
-            e[key] = true;
+        e[key] = !(row && row.expanded);
         expanded = e;
     }
 
@@ -267,9 +316,15 @@ FocusScope {
         case Qt.Key_Home: move(-rows.length); break;
         case Qt.Key_End: move(rows.length); break;
         case Qt.Key_Delete: endTask(event.modifiers & Qt.ShiftModifier); break;
+        case Qt.Key_Space:
+            // Mid-search, Space is part of it; otherwise it opens and closes, as Enter does.
+            if (search)
+                search += " ";
+            else if (selectedRow && selectedRow.kind === "group")
+                toggleGroup(selectedRow.key);
+            break;
         case Qt.Key_Return:
         case Qt.Key_Enter:
-        case Qt.Key_Space:
             if (selectedRow && selectedRow.kind === "group")
                 toggleGroup(selectedRow.key);
             break;

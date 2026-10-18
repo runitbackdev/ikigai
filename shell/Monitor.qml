@@ -16,14 +16,21 @@ Scope {
     // The latest sample as ikigai-monitor prints it (monitor/src/sample.rs); null before
     // the first, which arrives about a second after opening.
     property var sample: null
-    // The last minute, oldest first, each 0..1: the CPU, each core, memory in use, and
-    // each GPU by its bus id with its memory.
+    // The last minute, oldest first, a point a second, each 0..1: the CPU, each core,
+    // memory in use, and each GPU by its bus id with its memory.
     property var history: monitor.emptyHistory()
     // One past the graphs' 60: the extra is the oldest, sliding off their left edge.
     readonly property int keep: 61
+    // The graphs' step. A point a second whatever the tick, so the 60 across a graph are
+    // a minute on either page and a page flip doesn't mix two spacings in one curve.
+    readonly property int step: 1000
+    // The tick's time since the last point went in.
+    property int due: 0
     property string error: ""
-    // How often the feed samples: faster while Performance's graphs are showing.
+    // How often the feed samples: faster while Performance's numbers are showing.
     readonly property int interval: page === "performance" ? 500 : 1000
+    // Off from the feed dying until `respawn` brings it back.
+    property bool alive: true
 
     function emptyHistory() {
         return { cpu: [], cores: [], memory: [], gpus: {}, gpuMemory: {} };
@@ -38,7 +45,9 @@ Scope {
         if (open) {
             sample = null;
             history = emptyHistory();
+            due = 0;
             error = "";
+            alive = true;
         }
     }
 
@@ -63,7 +72,7 @@ Scope {
 
     Process {
         id: feed
-        running: monitor.open
+        running: monitor.open && monitor.alive
         command: ["ikigai-monitor"]
         stdinEnabled: true
         stdout: SplitParser {
@@ -73,10 +82,21 @@ Scope {
             onRead: line => console.warn("monitor:", line)
         }
         onStarted: monitor.request({ request: "interval", ms: monitor.interval })
+        // Started again after a pause while the card is up; the last sample stays on
+        // screen under the error until the new feed's first replaces it.
         onExited: (code, status) => {
-            if (monitor.open && !monitor.error)
-                monitor.error = "ikigai-monitor exited with " + code;
+            if (!monitor.open)
+                return;
+            monitor.error = "ikigai-monitor exited with " + code + ", restarting";
+            monitor.alive = false;
+            respawn.restart();
         }
+    }
+
+    Timer {
+        id: respawn
+        interval: 2000
+        onTriggered: monitor.alive = true
     }
 
     function request(r) {
@@ -109,12 +129,20 @@ Scope {
             console.warn("monitor: bad line", line.slice(0, 80));
             return;
         }
+        // The feed carries on after an error event, so a sample clears it again.
         if (d.event === "error") {
             error = d.message;
             return;
         }
         if (d.event !== "sample")
             return;
+        error = "";
+        due += interval;
+        if (sample !== null && due < step) {
+            sample = d;
+            return;
+        }
+        due = 0;
         const h = history;
         push(h.cpu, d.cpu.usage / 100);
         d.cpu.cores.forEach((c, i) => {
@@ -279,8 +307,7 @@ Scope {
                 }
             }
 
-            // Before the first sample, or after the feed died; it and the body cross-fade
-            // as the first sample lands.
+            // Before the first sample; it and the body cross-fade as the first sample lands.
             Text {
                 anchors.centerIn: parent
                 opacity: monitor.sample === null ? 1 : 0
@@ -307,10 +334,9 @@ Scope {
                     topMargin: Math.round(12 * Config.scale)
                     bottomMargin: card.pad
                 }
+                // Faded rather than hidden before the first sample: a hidden item can't hold
+                // focus, so keys typed while it is reading went nowhere.
                 opacity: monitor.sample !== null ? 1 : 0
-                // Shown the moment the sample lands, not once the fade is under way, so the
-                // current page has its focus back from the first frame.
-                visible: monitor.sample !== null || opacity > 0
 
                 Behavior on opacity {
                     Anim { effects: true }
@@ -348,7 +374,36 @@ Scope {
                     }
                     sample: monitor.sample
                     history: monitor.history
-                    interval: monitor.interval
+                    // The graphs slide a point at a time, so their pace is the history's.
+                    interval: monitor.step
+                }
+            }
+
+            // An error once samples are showing: the bridge's, or the feed dying. The
+            // numbers under it stay until the next sample clears it.
+            Rectangle {
+                anchors {
+                    horizontalCenter: parent.horizontalCenter
+                    bottom: parent.bottom
+                    bottomMargin: card.pad
+                }
+                z: 2
+                width: errorText.width + Math.round(28 * Config.scale)
+                height: Math.round(36 * Config.scale)
+                radius: height / 2
+                color: Theme.colors.surfaceContainerHigh
+                opacity: monitor.error && monitor.sample !== null ? 1 : 0
+                visible: opacity > 0
+
+                Behavior on opacity {
+                    Anim { effects: true }
+                }
+
+                Words {
+                    id: errorText
+                    anchors.centerIn: parent
+                    text: monitor.error
+                    color: Theme.colors.error
                 }
             }
         }

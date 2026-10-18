@@ -94,7 +94,10 @@ PanelWindow {
         height: window.open ? window.height : 0
     }
 
-    Item {
+    // A scope, not a plain Item: content dropped into the slot asks for focus before it
+    // is parented, and a plain Item here already held the window's focus, so Qt cleared
+    // the content's and every key but Escape stopped here.
+    FocusScope {
         anchors.fill: parent
         focus: true
 

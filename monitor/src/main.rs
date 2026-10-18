@@ -4,6 +4,10 @@
 //! stdin, one JSON object per line: `terminate` and `kill` with `pids`, `interval` with
 //! `ms`. Stdin closing ends it, and the child with it: Quickshell runs one of these for as
 //! long as the card is up, so nothing polls while it is closed.
+//!
+//! A reply that fails (a timeout, an error from the daemon, one that won't decode) is an
+//! `error` event and not the end: the connection is opened again, the daemon started again
+//! if it died, and the next tick carries on. Only failing to get it back ends the bridge.
 
 mod nng;
 mod sample;
@@ -13,7 +17,7 @@ use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
@@ -24,6 +28,8 @@ const MAGPIE: &str = "missioncenter-magpie";
 /// How long to wait for the daemon to open its socket. Its first CPU reading takes about
 /// half a second on top, with the answer being zeros until then.
 const START_WAIT: Duration = Duration::from_secs(5);
+/// Failed replies in a row before giving up on getting the daemon back.
+const RETRIES: u32 = 3;
 
 #[derive(Deserialize)]
 #[serde(tag = "request", rename_all = "snake_case")]
@@ -51,8 +57,11 @@ struct Daemon {
 
 impl Daemon {
     fn spawn() -> io::Result<Daemon> {
+        // A daemon started again gets its own socket, as the old one's Drop removes its own.
+        static STARTS: AtomicU32 = AtomicU32::new(0);
+        let start = STARTS.fetch_add(1, Ordering::Relaxed);
         let runtime_dir = std::env::var_os("XDG_RUNTIME_DIR").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
-        let socket = runtime_dir.join(format!("ikigai-monitor-{}.ipc", std::process::id()));
+        let socket = runtime_dir.join(format!("ikigai-monitor-{}-{start}.ipc", std::process::id()));
         let _ = std::fs::remove_file(&socket);
         let mut command = Command::new(MAGPIE);
         command.arg("--addr").arg(format!("ipc://{}", socket.display())).stdin(Stdio::null()).stdout(Stdio::null());
@@ -102,6 +111,26 @@ fn emit<T: Serialize>(out: &mut impl Write, event: &T) -> io::Result<()> {
     out.flush()
 }
 
+/// One failed reply: says so, and gets the daemon back before the next one.
+fn failed(out: &mut impl Write, daemon: &mut Daemon, client: &mut nng::Client, failures: &mut u32, e: io::Error) -> io::Result<()> {
+    *failures += 1;
+    emit(out, &Error { event: "error", message: &e.to_string() })?;
+    if *failures > RETRIES {
+        return Err(e);
+    }
+    recover(daemon, client)
+}
+
+/// Gets a working connection back after a failed reply. A fresh one, since a timed-out
+/// request can still be answered late and would put every reply after it one behind.
+fn recover(daemon: &mut Daemon, client: &mut nng::Client) -> io::Result<()> {
+    if daemon.child.try_wait()?.is_some() {
+        *daemon = Daemon::spawn()?;
+    }
+    *client = daemon.connect()?;
+    Ok(())
+}
+
 fn main() {
     if let Err(e) = run() {
         let stdout = io::stdout();
@@ -135,10 +164,17 @@ fn run() -> io::Result<()> {
     let stdout = io::stdout();
     let mut out = stdout.lock();
     let mut interval = Duration::from_millis(1000);
+    let mut failures = 0;
 
     while !stop.load(Ordering::Relaxed) {
         let next = Instant::now() + interval;
-        emit(&mut out, &sample::read(&mut client)?)?;
+        match sample::read(&mut client) {
+            Ok(sample) => {
+                failures = 0;
+                emit(&mut out, &sample)?;
+            }
+            Err(e) => failed(&mut out, &mut daemon, &mut client, &mut failures, e)?,
+        }
 
         loop {
             let now = Instant::now();
@@ -147,8 +183,16 @@ fn run() -> io::Result<()> {
             }
             match rx.recv_timeout(next - now) {
                 Ok(Input::Line(line)) => match serde_json::from_str::<Request>(&line) {
-                    Ok(Request::Terminate { pids }) => sample::terminate(&mut client, pids)?,
-                    Ok(Request::Kill { pids }) => sample::kill(&mut client, pids)?,
+                    Ok(Request::Terminate { pids }) => {
+                        if let Err(e) = sample::terminate(&mut client, pids) {
+                            failed(&mut out, &mut daemon, &mut client, &mut failures, e)?;
+                        }
+                    }
+                    Ok(Request::Kill { pids }) => {
+                        if let Err(e) = sample::kill(&mut client, pids) {
+                            failed(&mut out, &mut daemon, &mut client, &mut failures, e)?;
+                        }
+                    }
                     Ok(Request::Interval { ms }) => interval = Duration::from_millis(ms.clamp(250, 10_000)),
                     Err(e) => emit(&mut out, &Error { event: "error", message: &format!("bad request {line:?}: {e}") })?,
                 },

@@ -22,6 +22,12 @@ FocusScope {
         return gpus.find(g => g.id === id) || null;
     }
 
+    // A GPU that goes away takes the page back to the CPU, not to "GPU -1".
+    onGpusChanged: {
+        if (sample && device.startsWith("gpu:") && !gpus.some(g => "gpu:" + g.id === device))
+            device = "cpu";
+    }
+
     readonly property var devices: {
         if (!sample)
             return [];
@@ -416,69 +422,115 @@ FocusScope {
             rowSpacing: Math.round(12 * Config.scale)
             readonly property real cellWidth: detail.cellWidth
 
-            Repeater {
-                model: {
-                    if (!page.sample)
-                        return [];
-                    const s = page.sample;
-                    if (page.device === "cpu") {
-                        const c = s.cpu;
-                        return [
-                            { label: "Utilization", value: Units.percent(c.usage) },
-                            { label: "Speed", value: Units.ghz(c.freqMhz) },
-                            { label: "Kernel", value: Units.percent(c.kernel) },
-                            { label: "Processes", value: Units.count(c.processes) },
-                            { label: "Threads", value: Units.count(c.threads) },
-                            { label: "Handles", value: Units.count(c.handles) },
-                            { label: "Up time", value: Units.duration(c.uptime) },
-                            { label: "Base speed", value: c.baseKhz ? Units.ghz(c.baseKhz / 1000) : "" },
-                            { label: "Temperature", value: c.temp != null ? Math.round(c.temp) + " °C" : "" },
-                            { label: "Logical processors", value: String(c.cores.length) },
-                            { label: "Sockets", value: c.sockets ? String(c.sockets) : "" },
-                            { label: "Power", value: c.power != null ? c.power.toFixed(1) + " W" : "" },
-                            { label: "L1 cache", value: c.l1 ? Units.bytes(c.l1) : "" },
-                            { label: "L2 cache", value: c.l2 ? Units.bytes(c.l2) : "" },
-                            { label: "L3 cache", value: c.l3 ? Units.bytes(c.l3) : "" },
-                            { label: "Governor", value: c.governor || "" },
-                            { label: "Virtualization", value: c.virtualization || "" }
-                        ];
-                    }
-                    if (page.device === "memory") {
-                        const m = s.memory;
-                        return [
-                            { label: "In use", value: Units.bytes(m.used) },
-                            { label: "Available", value: Units.bytes(m.available) },
-                            { label: "Cached", value: Units.bytes(m.cached) },
-                            { label: "Committed", value: Units.bytes(m.committed) + " / " + Units.bytes(m.commitLimit) },
-                            { label: "Swap", value: m.swapTotal ? Units.bytes(m.swapTotal - m.swapFree) + " / " + Units.bytes(m.swapTotal) : "None" },
-                            { label: "Compressed", value: m.zswapped ? Units.bytes(m.zswapped) + " in " + Units.bytes(m.zswap) : "" },
-                            { label: "Free", value: Units.bytes(m.free) },
-                            { label: "Shared", value: Units.bytes(m.shmem) },
-                            { label: "Dirty", value: Units.bytes(m.dirty) }
-                        ];
-                    }
-                    const g = page.gpu;
-                    if (!g)
-                        return [];
+            // The labels hold still while the device does, so a tick only changes the
+            // numbers and the Stats stay put; the values follow the labels' order.
+            readonly property var labels: page.device === "cpu" ? [
+                "Utilization",
+                "Speed",
+                "Kernel",
+                "Processes",
+                "Threads",
+                "Handles",
+                "Up time",
+                "Base speed",
+                "Temperature",
+                "Logical processors",
+                "Sockets",
+                "Power",
+                "L1 cache",
+                "L2 cache",
+                "L3 cache",
+                "Governor",
+                "Virtualization"
+            ] : page.device === "memory" ? [
+                "In use",
+                "Available",
+                "Cached",
+                "Committed",
+                "Swap",
+                "Compressed",
+                "Free",
+                "Shared",
+                "Dirty"
+            ] : [
+                "Utilization",
+                "Dedicated memory",
+                "Shared memory",
+                "Temperature",
+                "Power",
+                "Clock",
+                "Memory clock",
+                "Video encode",
+                "Video decode",
+                "PCI Express",
+                "Bus"
+            ]
+            readonly property var values: {
+                if (!page.sample)
+                    return [];
+                const s = page.sample;
+                if (page.device === "cpu") {
+                    const c = s.cpu;
                     return [
-                        { label: "Utilization", value: Units.percent(g.usage || 0) },
-                        { label: "Dedicated memory", value: g.memTotal ? Units.bytes(g.memUsed || 0) + " / " + Units.bytes(g.memTotal) : "" },
-                        { label: "Shared memory", value: g.sharedTotal ? Units.bytes(g.sharedUsed || 0) + " / " + Units.bytes(g.sharedTotal) : "" },
-                        { label: "Temperature", value: g.temp != null ? Math.round(g.temp) + " °C" : "" },
-                        { label: "Power", value: g.power != null ? g.power.toFixed(0) + " W" + (g.maxPower ? " / " + g.maxPower.toFixed(0) + " W" : "") : "" },
-                        { label: "Clock", value: g.clock ? g.clock + " MHz" + (g.maxClock ? " / " + g.maxClock + " MHz" : "") : "" },
-                        { label: "Memory clock", value: g.memClock ? g.memClock + " MHz" + (g.maxMemClock ? " / " + g.maxMemClock + " MHz" : "") : "" },
-                        { label: "Video encode", value: g.encode != null ? Units.percent(g.encode) : "" },
-                        { label: "Video decode", value: g.decode != null ? Units.percent(g.decode) : "" },
-                        { label: "PCI Express", value: g.pcieGen ? "Gen " + g.pcieGen + (g.pcieLanes ? " x" + g.pcieLanes : "") : "" },
-                        { label: "Bus", value: g.id }
+                        Units.percent(c.usage),
+                        Units.ghz(c.freqMhz),
+                        Units.percent(c.kernel),
+                        Units.count(c.processes),
+                        Units.count(c.threads),
+                        Units.count(c.handles),
+                        Units.duration(c.uptime),
+                        c.baseKhz ? Units.ghz(c.baseKhz / 1000) : "",
+                        c.temp != null ? Math.round(c.temp) + " °C" : "",
+                        String(c.cores.length),
+                        c.sockets ? String(c.sockets) : "",
+                        c.power != null ? c.power.toFixed(1) + " W" : "",
+                        c.l1 ? Units.bytes(c.l1) : "",
+                        c.l2 ? Units.bytes(c.l2) : "",
+                        c.l3 ? Units.bytes(c.l3) : "",
+                        c.governor || "",
+                        c.virtualization || ""
                     ];
                 }
+                if (page.device === "memory") {
+                    const m = s.memory;
+                    return [
+                        Units.bytes(m.used),
+                        Units.bytes(m.available),
+                        Units.bytes(m.cached),
+                        Units.bytes(m.committed) + " / " + Units.bytes(m.commitLimit),
+                        m.swapTotal ? Units.bytes(m.swapTotal - m.swapFree) + " / " + Units.bytes(m.swapTotal) : "None",
+                        m.zswapped ? Units.bytes(m.zswapped) + " in " + Units.bytes(m.zswap) : "",
+                        Units.bytes(m.free),
+                        Units.bytes(m.shmem),
+                        Units.bytes(m.dirty)
+                    ];
+                }
+                const g = page.gpu;
+                if (!g)
+                    return [];
+                return [
+                    Units.percent(g.usage || 0),
+                    g.memTotal ? Units.bytes(g.memUsed || 0) + " / " + Units.bytes(g.memTotal) : "",
+                    g.sharedTotal ? Units.bytes(g.sharedUsed || 0) + " / " + Units.bytes(g.sharedTotal) : "",
+                    g.temp != null ? Math.round(g.temp) + " °C" : "",
+                    g.power != null ? g.power.toFixed(0) + " W" + (g.maxPower ? " / " + g.maxPower.toFixed(0) + " W" : "") : "",
+                    g.clock ? g.clock + " MHz" + (g.maxClock ? " / " + g.maxClock + " MHz" : "") : "",
+                    g.memClock ? g.memClock + " MHz" + (g.maxMemClock ? " / " + g.maxMemClock + " MHz" : "") : "",
+                    g.encode != null ? Units.percent(g.encode) : "",
+                    g.decode != null ? Units.percent(g.decode) : "",
+                    g.pcieGen ? "Gen " + g.pcieGen + (g.pcieLanes ? " x" + g.pcieLanes : "") : "",
+                    g.id
+                ];
+            }
+
+            Repeater {
+                model: stats.labels
 
                 Stat {
-                    required property var modelData
-                    label: modelData.label
-                    value: modelData.value
+                    required property string modelData
+                    required property int index
+                    label: modelData
+                    value: stats.values[index] ?? ""
                 }
             }
         }
