@@ -38,6 +38,7 @@ Item {
         StateLayer {
             radius: parent.radius
             hovered: hover.hovered
+            pressed: press.pressed
         }
     }
 
@@ -46,6 +47,7 @@ Item {
     }
 
     MouseArea {
+        id: press
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton | Qt.MiddleButton
         onClicked: mouse => {
@@ -101,7 +103,7 @@ Item {
             opacity: hover.hovered ? 1 : 0
 
             Behavior on opacity {
-                Anim { effects: true; fast: true }
+                Anim { effects: true }
             }
 
             Behavior on color {
@@ -113,10 +115,6 @@ Item {
                 name: "x"
                 size: 14
                 color: closeHover.hovered ? Theme.colors.surface : Theme.colors.fgVariant
-
-                Behavior on color {
-                    ColorAnim {}
-                }
             }
 
             HoverHandler {

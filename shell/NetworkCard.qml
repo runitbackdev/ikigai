@@ -1,3 +1,4 @@
+import Quickshell
 import QtQuick
 
 // The network card: the Wi-Fi switch and a rescan, the wired link when it is up, then
@@ -50,6 +51,7 @@ PopupCard {
                     anchors.centerIn: parent
                     name: Network.wifiEnabled ? "wifi-high" : "wifi-slash"
                     size: Theme.iconSize
+                    animate: true
                     color: Network.wifiEnabled ? Theme.colors.primary : Theme.colors.fgVariant
                 }
             }
@@ -67,12 +69,11 @@ PopupCard {
                     font.weight: Font.Medium
                 }
 
-                Text {
+                Words {
                     width: parent.width
                     text: Network.pending !== "" ? "Connecting to " + Network.pending : Network.error !== "" ? Network.error : Network.ssid !== "" ? "Connected to " + Network.ssid : ""
                     visible: text !== ""
                     color: Network.error !== "" && Network.pending === "" ? Theme.colors.error : Theme.colors.fgVariant
-                    font.family: Theme.fontFamily
                     font.pointSize: Theme.fontSize - 1
                     elide: Text.ElideRight
                 }
@@ -134,8 +135,14 @@ PopupCard {
             }
         }
 
+        // Each scan builds new objects; keyed on the SSID, rows keep their hover and
+        // aren't rebuilt every 15 s. Empty while the card is hidden, so a change in range
+        // doesn't diff rows nobody sees.
         Repeater {
-            model: Network.wifiEnabled ? Network.networks : []
+            model: ScriptModel {
+                values: card.live && Network.wifiEnabled ? Network.networks : []
+                objectProp: "ssid"
+            }
 
             Column {
                 id: row
@@ -151,6 +158,7 @@ PopupCard {
 
                     StateLayer {
                         hovered: rowHover.hovered
+                        pressed: rowPress.pressed
                         active: row.modelData.active
                     }
 
@@ -162,10 +170,11 @@ PopupCard {
                         }
                         name: Network.wifiIcon(row.modelData.strength)
                         size: 16
+                        animate: true
                         color: row.modelData.active ? Theme.colors.primary : Theme.colors.fg
                     }
 
-                    Text {
+                    Words {
                         anchors {
                             left: parent.left
                             leftMargin: 34
@@ -175,8 +184,6 @@ PopupCard {
                         }
                         text: row.modelData.ssid
                         color: row.modelData.active ? Theme.colors.primary : Theme.colors.fg
-                        font.family: Theme.fontFamily
-                        font.pointSize: Theme.fontSize
                         elide: Text.ElideRight
                     }
 
@@ -189,6 +196,7 @@ PopupCard {
                         }
                         name: row.modelData.active ? "check" : "lock-simple"
                         size: 14
+                        animate: true
                         visible: row.modelData.active || row.modelData.secure
                         color: row.modelData.active ? Theme.colors.primary : Theme.colors.outline
                     }
@@ -198,6 +206,7 @@ PopupCard {
                     }
 
                     MouseArea {
+                        id: rowPress
                         anchors.fill: parent
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         onClicked: mouse => {

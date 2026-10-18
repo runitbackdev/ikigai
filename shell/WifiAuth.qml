@@ -1,7 +1,5 @@
 import Quickshell
-import Quickshell.Wayland
 import QtQuick
-import QtQuick.Effects
 
 // The password window for a new secured network, in the polkit card's shape: the rail's
 // popout has no keyboard focus, an Overlay layer with exclusive focus does. Opens while
@@ -10,7 +8,45 @@ import QtQuick.Effects
 Scope {
     id: scope
 
+    readonly property bool open: Network.asking !== ""
     readonly property bool busy: Network.pending !== "" && Network.pending === Network.asking
+    readonly property string status: busy ? "Connecting…" : Network.error
+
+    // The window outlives the request by its fade, with the network's name and the last
+    // status held so the card does not empty on the way out.
+    property bool closing: false
+    property string ssid: ""
+    property var note: ({ text: "", busy: false })
+
+    onOpenChanged: {
+        closing = !open;
+        if (closing)
+            fade.restart();
+        else
+            fade.stop();
+    }
+
+    Timer {
+        id: fade
+        interval: Motion.defaultEffects
+        onTriggered: scope.closing = false
+    }
+
+    Binding {
+        target: scope
+        property: "ssid"
+        value: Network.asking
+        when: scope.open
+        restoreMode: Binding.RestoreNone
+    }
+
+    Binding {
+        target: scope
+        property: "note"
+        value: ({ text: scope.status, busy: scope.busy })
+        when: scope.status !== ""
+        restoreMode: Binding.RestoreNone
+    }
 
     function close() {
         Network.asking = "";
@@ -26,88 +62,67 @@ Scope {
     }
 
     LazyLoader {
-        active: Network.asking !== ""
+        active: scope.open || scope.closing
 
-        PanelWindow {
-            screen: Screens.primary
+        DialogWindow {
+            layerName: "wifi"
+            closing: scope.closing
+            onDismissed: scope.close()
 
-            anchors {
-                left: true
-                right: true
-                top: true
-                bottom: true
-            }
-            exclusionMode: ExclusionMode.Ignore
-            WlrLayershell.layer: WlrLayer.Overlay
-            WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-            WlrLayershell.namespace: "ikigai:wifi"
-            color: Qt.alpha("black", 0.5)
+            DialogCard {
+                id: card
 
-            MouseArea {
-                anchors.fill: parent
-                onClicked: scope.close()
-            }
+                readonly property int fieldWidth: Math.round(300 * Config.scale)
 
-            Item {
-                anchors.fill: parent
-                focus: true
-                Keys.onEscapePressed: scope.close()
+                anchors.centerIn: parent
+                shown: !scope.closing
 
-                Rectangle {
-                    id: card
+                function submit() {
+                    if (scope.busy || password.text === "")
+                        return;
+                    Network.connect(Network.asking, password.text);
+                }
 
-                    readonly property int pad: Math.round(28 * Config.scale)
-                    readonly property int fieldWidth: Math.round(300 * Config.scale)
+                // Asked again inside the fade, the same window comes back: start it empty.
+                Connections {
+                    target: scope
 
-                    anchors.centerIn: parent
-                    width: column.width + 2 * pad
-                    height: column.height + 2 * pad
-                    radius: Theme.cardRadius
-                    color: Theme.colors.surface
-                    layer.enabled: true
-                    layer.effect: MultiEffect {
-                        shadowEnabled: true
-                        blurMax: 15
-                        shadowColor: Qt.alpha("black", 0.6)
+                    function onOpenChanged() {
+                        if (scope.open)
+                            password.text = "";
                     }
+                }
 
-                    MouseArea {
-                        anchors.fill: parent
-                    }
-
-                    function submit() {
-                        if (scope.busy || password.text === "")
-                            return;
-                        Network.connect(Network.asking, password.text);
-                    }
+                Column {
+                    id: column
+                    spacing: Math.round(16 * Config.scale)
 
                     Column {
-                        id: column
-                        x: card.pad
-                        y: card.pad
-                        spacing: Math.round(16 * Config.scale)
+                        width: card.fieldWidth
+                        spacing: 4
 
-                        Column {
-                            width: card.fieldWidth
-                            spacing: 4
-
-                            Text {
-                                text: "Connect to " + Network.asking
-                                width: parent.width
-                                color: Theme.colors.fg
-                                font.family: Theme.fontFamily
-                                font.pointSize: Theme.fontSize + 3
-                                font.weight: Font.Medium
-                                elide: Text.ElideRight
-                            }
-
-                            Text {
-                                text: "This network needs a password."
-                                color: Theme.colors.fgVariant
-                                font.family: Theme.fontFamily
-                                font.pointSize: Theme.fontSize
-                            }
+                        Text {
+                            text: "Connect to " + scope.ssid
+                            width: parent.width
+                            color: Theme.colors.fg
+                            font.family: Theme.fontFamily
+                            font.pointSize: Theme.fontSize + 3
+                            font.weight: Font.Medium
+                            elide: Text.ElideRight
                         }
+
+                        Text {
+                            text: "This network needs a password."
+                            color: Theme.colors.fgVariant
+                            font.family: Theme.fontFamily
+                            font.pointSize: Theme.fontSize
+                        }
+                    }
+
+                    // The status carries its own gap, so it opens under the field and the
+                    // buttons slide down rather than jump.
+                    Column {
+                        width: card.fieldWidth
 
                         Rectangle {
                             width: card.fieldWidth
@@ -169,30 +184,36 @@ Scope {
                             }
                         }
 
-                        Text {
-                            width: card.fieldWidth
-                            text: scope.busy ? "Connecting…" : Network.error
-                            visible: text !== ""
-                            color: scope.busy ? Theme.colors.fgVariant : Theme.colors.error
-                            font.family: Theme.fontFamily
-                            font.pointSize: Theme.fontSize
+                        DialogReveal {
+                            width: parent.width
+                            gap: column.spacing
+                            shown: scope.status !== ""
+
+                            Text {
+                                width: parent.width
+                                text: scope.note.text
+                                color: scope.note.busy ? Theme.colors.fgVariant : Theme.colors.error
+                                font.family: Theme.fontFamily
+                                font.pointSize: Theme.fontSize
+                                wrapMode: Text.Wrap
+                            }
+                        }
+                    }
+
+                    Row {
+                        anchors.right: parent.right
+                        spacing: Math.round(10 * Config.scale)
+
+                        Pill {
+                            label: "Cancel"
+                            onClicked: scope.close()
                         }
 
-                        Row {
-                            anchors.right: parent.right
-                            spacing: Math.round(10 * Config.scale)
-
-                            Pill {
-                                label: "Cancel"
-                                onClicked: scope.close()
-                            }
-
-                            Pill {
-                                primary: true
-                                label: "Connect"
-                                enabled: !scope.busy && password.text !== ""
-                                onClicked: card.submit()
-                            }
+                        Pill {
+                            primary: true
+                            label: "Connect"
+                            enabled: !scope.busy && password.text !== ""
+                            onClicked: card.submit()
                         }
                     }
                 }

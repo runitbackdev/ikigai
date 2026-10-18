@@ -19,8 +19,10 @@ Scope {
             scope.engage();
         }
 
+        // Instant: logind unlocking from outside has nobody watching an exit.
         function unlock(): void {
             console.info("unlock");
+            unlockTimer.stop();
             lock.locked = false;
         }
 
@@ -52,9 +54,8 @@ Scope {
             const said = scope.said;
             scope.said = "";
             if (result === PamResult.Success) {
-                lock.locked = false;
-                if (scope.card)
-                    scope.card.clear();
+                scope.unlocking = true;
+                unlockTimer.restart();
             } else if (scope.card) {
                 scope.card.reject(said || (result === PamResult.MaxTries ? "Too many attempts" : "Wrong password"));
             }
@@ -70,12 +71,34 @@ Scope {
     property string pending: ""
     property string said: ""
     property var card: null
+    property bool unlocking: false
+
+    // The card fades out before the lock lets go. A timer rather than the animation's
+    // end, so nothing about the animation can keep the screen locked.
+    Timer {
+        id: unlockTimer
+        interval: Motion.standard
+        onTriggered: {
+            lock.locked = false;
+            if (scope.card)
+                scope.card.clear();
+        }
+    }
 
     // cosmic-comp moves keyboard focus to a lock surface only while fixing up a focus
     // that became invalid; with nothing focused (an empty desktop) it never does, and
     // the card would need a click. So take focus with an exclusive layer first, lock,
     // then drop the layer: its death is what makes the compositor look again.
     function engage() {
+        // A lock asked for mid-exit keeps it: the card comes back, ready to type again.
+        if (unlocking) {
+            unlockTimer.stop();
+            unlocking = false;
+            if (card) {
+                card.busy = false;
+                card.clear();
+            }
+        }
         bait.active = true;
         engageTimer.restart();
     }
@@ -152,19 +175,37 @@ Scope {
         locked: false
         onSecureChanged: scope.setLockedHint(secure)
         onLockedChanged: {
-            if (!locked)
+            if (!locked) {
+                scope.unlocking = false;
                 Screens.nudge();
+            }
         }
 
         WlSessionLockSurface {
             id: surface
             color: Theme.colors.surface
 
+            // Decoded at the screen's size, not the file's, and faded in over the
+            // surface colour once ready rather than appearing mid-frame.
             Image {
+                // Fades in on the first decode only; a later resize (output waking in another
+                // mode, a scale change) re-decodes behind the old frame instead of blanking.
+                property bool loaded: false
+
                 anchors.fill: parent
-                source: "file:///usr/local/share/ikigai/theme/wallpaper.jpg"
+                // Held back until the surface has its size, else the first decode is the
+                // full file anyway, or runs at zero height, and the resize decodes it again.
+                source: width > 0 && height > 0 ? "file:///usr/local/share/ikigai/theme/wallpaper.jpg" : ""
+                sourceSize: Qt.size(width, height)
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
+                retainWhileLoading: true
+                opacity: loaded ? 1 : 0
+                onStatusChanged: if (status === Image.Ready) loaded = true
+
+                Behavior on opacity {
+                    Anim { effects: true; slow: true }
+                }
             }
 
             Loader {
@@ -174,6 +215,7 @@ Scope {
 
                 sourceComponent: AuthCard {
                     user: Accounts.current
+                    shown: !scope.unlocking
                     Component.onCompleted: scope.card = this
                     onSubmit: password => {
                         scope.pending = password;

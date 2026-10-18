@@ -26,6 +26,7 @@ PopupCard {
                 anchors.verticalCenter: parent.verticalCenter
                 name: Power.icon
                 size: 26
+                animate: true
                 color: Power.low ? Theme.colors.error : Theme.colors.fg
             }
 
@@ -63,8 +64,13 @@ PopupCard {
                 radius: parent.radius
                 color: Power.low ? Theme.colors.error : Theme.colors.primary
 
+                // A fill stops at the track's end, so no overshoot.
                 Behavior on width {
-                    Anim {}
+                    Anim { standard: true }
+                }
+
+                Behavior on color {
+                    ColorAnim {}
                 }
             }
         }
@@ -91,6 +97,7 @@ PopupCard {
 
                     StateLayer {
                         hovered: cellHover.hovered
+                        pressed: cellPress.pressed
                         active: cell.current
                     }
 
@@ -105,11 +112,10 @@ PopupCard {
                             color: cell.current ? Theme.colors.primary : Theme.colors.fgVariant
                         }
 
-                        Text {
+                        Words {
                             anchors.horizontalCenter: parent.horizontalCenter
                             text: cell.modelData.label
                             color: cell.current ? Theme.colors.primary : Theme.colors.fgVariant
-                            font.family: Theme.fontFamily
                             font.pointSize: Theme.fontSize - 2
                         }
                     }
@@ -119,6 +125,7 @@ PopupCard {
                     }
 
                     MouseArea {
+                        id: cellPress
                         anchors.fill: parent
                         onClicked: Power.setProfile(cell.modelData.profile)
                     }

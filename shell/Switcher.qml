@@ -88,7 +88,7 @@ Scope {
 
     Timer {
         id: fade
-        interval: Motion.fastEffects
+        interval: Motion.defaultEffects
         onTriggered: {
             switcher.open = false;
             switcher.closing = false;
@@ -129,8 +129,26 @@ Scope {
             WlrLayershell.namespace: "ikigai:switcher"
             exclusionMode: ExclusionMode.Ignore
             color: "transparent"
-            implicitWidth: card.width + 2 * shadowRoom
-            implicitHeight: card.height + 2 * shadowRoom
+
+            // Mid-cycle the list only shrinks, so the surface keeps the largest size the
+            // card has wanted and the card shrinks inside it: following the card's
+            // animation would reconfigure the surface every frame. The mask keeps the
+            // room it leaves from taking clicks.
+            readonly property real fitWidth: grid.width + 2 * pad
+            readonly property real fitHeight: grid.height + 2 * pad
+            property real roomWidth: fitWidth
+            property real roomHeight: fitHeight
+            onFitWidthChanged: roomWidth = Math.max(roomWidth, fitWidth)
+            onFitHeightChanged: roomHeight = Math.max(roomHeight, fitHeight)
+            implicitWidth: roomWidth + 2 * shadowRoom
+            implicitHeight: roomHeight + 2 * shadowRoom
+
+            mask: Region {
+                x: card.x
+                y: card.y
+                width: card.width
+                height: card.height
+            }
 
             Item {
                 id: keys
@@ -177,8 +195,8 @@ Scope {
             Rectangle {
                 id: card
                 anchors.centerIn: parent
-                width: grid.width + 2 * window.pad
-                height: grid.height + 2 * window.pad
+                width: window.fitWidth
+                height: window.fitHeight
                 property bool shown: false
 
                 radius: Theme.cardRadius
@@ -192,7 +210,16 @@ Scope {
                     shadowColor: Qt.alpha("black", 0.6)
                 }
 
-                Component.onCompleted: shown = true
+                // The surface is new on every open; started at creation the entry ran
+                // before the compositor showed a frame and was mostly over by then.
+                Connections {
+                    target: card.Window.window
+                    enabled: !card.shown
+
+                    function onFrameSwapped() {
+                        card.shown = true;
+                    }
+                }
 
                 Behavior on opacity {
                     Anim { effects: true }
@@ -202,12 +229,28 @@ Scope {
                     Anim {}
                 }
 
+                // Standard, in step with the tiles' move: an overshoot would cut into them.
+                Behavior on width {
+                    enabled: card.shown
+                    Anim { standard: true }
+                }
+
+                Behavior on height {
+                    enabled: card.shown
+                    Anim { standard: true }
+                }
+
                 Grid {
                     id: grid
                     x: window.pad
                     y: window.pad
                     columns: Math.max(1, Math.floor((window.screen.width - 160) / (window.tileWidth + window.gap)))
                     spacing: window.gap
+
+                    // A window closed mid-cycle: the tiles after it close the gap.
+                    move: Transition {
+                        Anim { properties: "x,y"; standard: true }
+                    }
 
                     Repeater {
                         model: ScriptModel {

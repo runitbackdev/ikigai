@@ -1,10 +1,9 @@
 import QtQuick
 
-// Anim's effects curve for colours, so fills and outlines settle the way opacity does.
+// Colours take the slow effects curve, as caelestia's do: a tint change is a state change
+// the eye should follow, slower than the opacity fades around it.
 ColorAnimation {
-    property bool fast: false
-
-    duration: fast ? Motion.fastEffects : Motion.defaultEffects
+    duration: Motion.slowEffects
     easing.type: Easing.BezierSpline
-    easing.bezierCurve: fast ? Motion.fastEffectsCurve : Motion.defaultEffectsCurve
+    easing.bezierCurve: Motion.slowEffectsCurve
 }

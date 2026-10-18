@@ -71,3 +71,7 @@ BluetoothAuth 1.0 BluetoothAuth.qml
 TrayButton 1.0 TrayButton.qml
 TrayMenu 1.0 TrayMenu.qml
 TrayEntries 1.0 TrayEntries.qml
+Words 1.0 Words.qml
+DialogCard 1.0 DialogCard.qml
+DialogReveal 1.0 DialogReveal.qml
+DialogWindow 1.0 DialogWindow.qml

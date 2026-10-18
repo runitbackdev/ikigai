@@ -21,6 +21,7 @@ PopupCard {
 
         StateLayer {
             hovered: entryHover.hovered
+            pressed: entryPress.pressed
         }
 
         Text {
@@ -52,6 +53,7 @@ PopupCard {
         }
 
         MouseArea {
+            id: entryPress
             anchors.fill: parent
             onClicked: {
                 card.done();

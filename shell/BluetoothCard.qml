@@ -1,3 +1,4 @@
+import Quickshell
 import Quickshell.Bluetooth as Bluez
 import QtQuick
 
@@ -51,6 +52,7 @@ PopupCard {
                     anchors.centerIn: parent
                     name: Bluetooth.enabled ? "bluetooth" : "bluetooth-slash"
                     size: Theme.iconSize
+                    animate: true
                     color: Bluetooth.enabled ? Theme.colors.primary : Theme.colors.fgVariant
                 }
             }
@@ -68,12 +70,11 @@ PopupCard {
                     font.weight: Font.Medium
                 }
 
-                Text {
+                Words {
                     width: parent.width
                     text: Bluetooth.error !== "" ? Bluetooth.error : Bluetooth.enabled && Bluetooth.connectedCount > 0 ? "Connected to " + Bluetooth.connectedNames() : Bluetooth.enabled && Bluetooth.discovering ? "Searching…" : ""
                     visible: text !== ""
                     color: Bluetooth.error !== "" ? Theme.colors.error : Theme.colors.fgVariant
-                    font.family: Theme.fontFamily
                     font.pointSize: Theme.fontSize - 1
                     elide: Text.ElideRight
                 }
@@ -95,8 +96,14 @@ PopupCard {
             }
         }
 
+        // The list is re-sorted on every device change; keyed on the address, rows keep
+        // their hover instead of being rebuilt. Empty while the card is hidden, so a
+        // battery or signal change doesn't diff rows nobody sees.
         Repeater {
-            model: Bluetooth.enabled ? Bluetooth.listed : []
+            model: ScriptModel {
+                values: card.live && Bluetooth.enabled ? Bluetooth.listed : []
+                objectProp: "address"
+            }
 
             Column {
                 id: row
@@ -115,6 +122,7 @@ PopupCard {
 
                     StateLayer {
                         hovered: rowHover.hovered
+                        pressed: rowPress.pressed
                         active: row.modelData.connected
                     }
 
@@ -129,7 +137,7 @@ PopupCard {
                         color: row.modelData.connected ? Theme.colors.primary : row.paired ? Theme.colors.fg : Theme.colors.fgVariant
                     }
 
-                    Text {
+                    Words {
                         anchors {
                             left: parent.left
                             leftMargin: 34
@@ -139,8 +147,6 @@ PopupCard {
                         }
                         text: row.modelData.name
                         color: row.modelData.connected ? Theme.colors.primary : row.paired ? Theme.colors.fg : Theme.colors.fgVariant
-                        font.family: Theme.fontFamily
-                        font.pointSize: Theme.fontSize
                         elide: Text.ElideRight
                     }
 
@@ -176,6 +182,7 @@ PopupCard {
                     }
 
                     MouseArea {
+                        id: rowPress
                         anchors.fill: parent
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                         onClicked: mouse => {

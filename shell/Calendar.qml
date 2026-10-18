@@ -12,11 +12,43 @@ Column {
 
     spacing: Math.round(6 * Config.scale)
 
+    // Paging slides the month out the way it is going and the next one in from the other
+    // side, fading across the swap. `next` is where paging is headed, so a click mid-slide
+    // counts from it, not from the month still on screen. The way out is timed with the
+    // fade so the month never sits invisible; only the way in springs.
+    property date next: shown
+    property int direction: 1
+    property real slide: 0
+    property real fade: 1
+    readonly property int travel: Math.round(20 * Config.scale)
+
     function shift(months) {
-        const d = new Date(shown);
+        const d = new Date(paging.running ? next : shown);
         d.setDate(1);
         d.setMonth(d.getMonth() + months);
-        shown = d;
+        paging.stop();
+        next = d;
+        direction = months > 0 ? 1 : -1;
+        paging.start();
+    }
+
+    SequentialAnimation {
+        id: paging
+
+        ParallelAnimation {
+            Anim { target: calendar; property: "slide"; to: -calendar.direction * calendar.travel; effects: true; fast: true }
+            Anim { target: calendar; property: "fade"; to: 0; effects: true; fast: true }
+        }
+        ScriptAction {
+            script: {
+                calendar.shown = calendar.next;
+                calendar.slide = calendar.direction * calendar.travel;
+            }
+        }
+        ParallelAnimation {
+            Anim { target: calendar; property: "slide"; to: 0 }
+            Anim { target: calendar; property: "fade"; to: 1; effects: true }
+        }
     }
 
     function isToday(day) {
@@ -42,6 +74,8 @@ Column {
         Text {
             anchors.centerIn: parent
             text: Qt.formatDate(calendar.shown, "MMMM yyyy")
+            opacity: calendar.fade
+            transform: Translate { x: calendar.slide }
             color: Theme.colors.fg
             font.family: Theme.fontFamily
             font.pointSize: Theme.fontSize
@@ -84,6 +118,8 @@ Column {
         columns: 7
         columnSpacing: (parent.width - 7 * calendar.cell) / 6
         rowSpacing: 2
+        opacity: calendar.fade
+        transform: Translate { x: calendar.slide }
 
         Repeater {
             model: 42

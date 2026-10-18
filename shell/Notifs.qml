@@ -9,6 +9,8 @@ Singleton {
     id: root
 
     property var toasts: []
+    // Toasts on screen, which see a close from the app's side out themselves before they go.
+    property var held: []
     property var history: []
     property int unread: 0
     // Unread count per app, so a rail button can badge its own. Keyed by desktop entry
@@ -37,7 +39,10 @@ Singleton {
     function receive(n) {
         console.info("notification", n.appName, JSON.stringify(n.summary), "unread", unread + 1);
         n.tracked = true;
-        n.closed.connect(() => root.forget(n));
+        n.closed.connect(() => {
+            if (!root.held.includes(n))
+                root.forget(n);
+        });
         history = [snapshot(n), ...history].slice(0, 50);
         unread += 1;
         const app = key(n.desktopEntry || n.appName);
@@ -47,8 +52,25 @@ Singleton {
         toasts = [...toasts, n];
     }
 
+    // A no-op once it's gone: a row's release on destruction lands while the stack's
+    // model is still applying the removal that destroyed it.
     function forget(n) {
-        toasts = toasts.filter(t => t !== n);
+        if (toasts.includes(n))
+            toasts = toasts.filter(t => t !== n);
+    }
+
+    function hold(n) {
+        held = [...held, n];
+    }
+
+    // Let go by a toast that never finished leaving (its screen went), so a notification
+    // already closed doesn't sit in the list with nothing to show it.
+    function release(n, closed) {
+        const i = held.indexOf(n);
+        if (i >= 0)
+            held = held.filter((_, j) => j !== i);
+        if (closed && !held.includes(n))
+            forget(n);
     }
 
     function remove(entry) {

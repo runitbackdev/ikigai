@@ -19,8 +19,14 @@ PopupCard {
             top: parent.top
         }
 
+        // Diffed by id: Bridge hands over fresh arrays on every event, and rebuilding the
+        // rows would drop their hover and land the active tint without its fade. Only
+        // while the card is up: every window event would refilter a hidden list.
         Repeater {
-            model: Bridge.workspaces.filter(w => !popup.screen || w.outputs.includes(popup.screen.name))
+            model: ScriptModel {
+                values: !popup.live ? [] : Bridge.workspaces.filter(w => !popup.screen || w.outputs.includes(popup.screen.name))
+                objectProp: "id"
+            }
 
             Item {
                 id: row
@@ -33,9 +39,10 @@ PopupCard {
                 StateLayer {
                     active: row.modelData.active
                     hovered: rowHover.hovered
+                    pressed: rowPress.pressed
                 }
 
-                Text {
+                Words {
                     id: name
                     anchors {
                         left: parent.left
@@ -44,8 +51,6 @@ PopupCard {
                     }
                     text: row.modelData.name
                     color: row.modelData.active ? Theme.colors.primary : Theme.colors.fg
-                    font.family: Theme.fontFamily
-                    font.pointSize: Theme.fontSize
                     font.bold: row.modelData.active
                 }
 
@@ -54,6 +59,7 @@ PopupCard {
                 }
 
                 MouseArea {
+                    id: rowPress
                     anchors.fill: parent
                     onClicked: {
                         popup.done();
@@ -70,7 +76,10 @@ PopupCard {
                     spacing: 6
 
                     Repeater {
-                        model: row.windows
+                        model: ScriptModel {
+                            values: row.windows
+                            objectProp: "id"
+                        }
 
                         AppIcon {
                             id: icon

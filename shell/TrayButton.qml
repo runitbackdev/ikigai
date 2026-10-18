@@ -26,6 +26,10 @@ BarButton {
         sourceSize: Qt.size(64, 64)
         fillMode: Image.PreserveAspectFit
         opacity: button.item.status === Status.Passive ? 0.6 : 1
+
+        Behavior on opacity {
+            Anim { effects: true }
+        }
     }
 
     WheelHandler {

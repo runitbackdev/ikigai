@@ -11,6 +11,8 @@ FocusScope {
     property var history: ({ cpu: [], cores: [], memory: [], gpus: {}, gpuMemory: {} })
     property string device: "cpu"
     property bool perCore: false
+    // The feed's tick, so the graphs scroll in step with it.
+    property int interval: 500
 
     readonly property var gpus: sample ? sample.gpus : []
     readonly property var gpu: {
@@ -109,6 +111,10 @@ FocusScope {
                 radius: Theme.radius
                 color: current ? Theme.colors.surfaceContainerHigh : "transparent"
 
+                Behavior on color {
+                    ColorAnim {}
+                }
+
                 StateLayer {
                     hovered: itemHover.hovered && !item.current
                 }
@@ -132,6 +138,7 @@ FocusScope {
                         anchors.fill: parent
                         anchors.margins: 1
                         values: item.modelData.series
+                        interval: page.interval
                         grid: false
                         lineWidth: 1
                     }
@@ -253,6 +260,7 @@ FocusScope {
                 anchors.fill: parent
                 anchors.margins: 1
                 visible: !(page.device === "cpu" && page.perCore)
+                interval: page.interval
                 values: page.device === "cpu" ? page.history.cpu : page.device === "memory" ? page.history.memory : page.gpu ? (page.history.gpus[page.gpu.id] || []) : []
             }
 
@@ -265,11 +273,14 @@ FocusScope {
                 rows: Math.max(1, Math.ceil(count / columns))
                 spacing: Math.round(4 * Config.scale)
 
+                // Keyed by count, so a sample swaps each graph's values instead of
+                // rebuilding every cell.
                 Repeater {
-                    model: page.perCore ? page.history.cores : []
+                    model: page.perCore ? page.history.cores.length : 0
 
                     Rectangle {
-                        required property var modelData
+                        id: core
+                        required property int index
                         width: (parent.width - (parent.columns - 1) * parent.spacing) / parent.columns
                         height: (parent.height - (parent.rows - 1) * parent.spacing) / parent.rows
                         color: "transparent"
@@ -279,7 +290,8 @@ FocusScope {
                         Graph {
                             anchors.fill: parent
                             anchors.margins: 1
-                            values: parent.modelData
+                            values: page.history.cores[core.index] || []
+                            interval: page.interval
                             grid: false
                             lineWidth: 1
                         }
@@ -336,6 +348,7 @@ FocusScope {
                     anchors.fill: parent
                     anchors.margins: 1
                     values: page.gpu ? (page.history.gpuMemory[page.gpu.id] || []) : []
+                    interval: page.interval
                 }
             }
         }

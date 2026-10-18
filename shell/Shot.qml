@@ -120,7 +120,7 @@ Scope {
     property var pendingRecord: null
 
     function commit(window, rect) {
-        if (!frozen || closing || flashing)
+        if (!frozen || closing || flashing || !window.ready)
             return;
         if (shot.action === "record") {
             console.info("shot record", window.screen.name, window.wholeScreen ? "whole" : rect.width + "x" + rect.height);
@@ -181,7 +181,7 @@ Scope {
 
     Timer {
         id: fade
-        interval: Motion.fastEffects
+        interval: Motion.defaultEffects
         onTriggered: {
             shot.open = false;
             shot.closing = false;
@@ -251,6 +251,30 @@ Scope {
         }
     }
 
+    // A window onto the frozen capture at its place on the screen. Every image of a
+    // capture loads the same URL into the pixmap cache, so they share one decode and one
+    // texture.
+    component Cutout: Item {
+        id: cutout
+
+        property string source
+        property size full
+        readonly property bool ready: image.status === Image.Ready
+
+        clip: true
+
+        Image {
+            id: image
+            x: -cutout.x
+            y: -cutout.y
+            width: cutout.full.width
+            height: cutout.full.height
+            source: cutout.source
+            asynchronous: true
+            fillMode: Image.Stretch
+        }
+    }
+
     Variants {
         model: shot.open ? Quickshell.screens : []
 
@@ -271,12 +295,51 @@ Scope {
             WlrLayershell.namespace: "ikigai:shot"
             color: "transparent"
 
-            readonly property string frozen: shot.frozen ? "file://" + shot.dir + "/" + modelData.name + ".png" : ""
+            // The stamp keeps the cache from handing back the last shot's capture.
+            readonly property string frozen: shot.frozen ? "file://" + shot.dir + "/" + modelData.name + ".png?" + shot.stamp : ""
+            readonly property bool ready: frozenImage.status === Image.Ready && crop.ready
             readonly property bool picking: shot.mode === "color" && hover.hovered
             readonly property bool wholeScreen: shot.mode === "screen" && hover.hovered
             readonly property var target: shot.mode === "window" && hover.hovered ? windowUnder(hover.point.position) : null
             readonly property rect shown: wholeScreen ? Qt.rect(0, 0, content.width, content.height) : target ? target.rect : selection
             readonly property bool selecting: shown.width > 0 && shown.height > 0
+
+            // Where the highlight is drawn. It glides between windows and onto the screen,
+            // follows a drag 1:1, and appears where it lands rather than growing out of a
+            // corner; between targets it keeps its last place, hidden, to glide on from.
+            // The crop stays on `shown`, so a commit mid-glide grabs the real rect.
+            property real drawnX
+            property real drawnY
+            property real drawnWidth
+            property real drawnHeight
+
+            // Read off `shown` itself: the bindings on it may not have caught up yet.
+            onShownChanged: {
+                const r = shown;
+                if (r.width <= 0 || r.height <= 0)
+                    return;
+                if (dragging || drawnWidth <= 0 || drawnHeight <= 0) {
+                    glide.stop();
+                    drawnX = r.x;
+                    drawnY = r.y;
+                    drawnWidth = r.width;
+                    drawnHeight = r.height;
+                } else {
+                    glideX.to = r.x;
+                    glideY.to = r.y;
+                    glideWidth.to = r.width;
+                    glideHeight.to = r.height;
+                    glide.restart();
+                }
+            }
+
+            ParallelAnimation {
+                id: glide
+                Anim { id: glideX; target: window; property: "drawnX"; standard: true }
+                Anim { id: glideY; target: window; property: "drawnY"; standard: true }
+                Anim { id: glideWidth; target: window; property: "drawnWidth"; standard: true }
+                Anim { id: glideHeight; target: window; property: "drawnHeight"; standard: true }
+            }
 
             // Windows on this output's active workspace, most recently active first: the
             // best stand-in for stacking order, which nothing on the wire carries.
@@ -306,10 +369,12 @@ Scope {
                 id: content
                 anchors.fill: parent
                 focus: true
-                opacity: shot.frozen && !shot.closing ? 1 : 0
+                // Held back until the capture has decoded, so the fade starts on a
+                // painted frame rather than behind the decode.
+                opacity: shot.frozen && !shot.closing && frozenImage.status === Image.Ready ? 1 : 0
 
                 Behavior on opacity {
-                    Anim { effects: true; fast: true }
+                    Anim { effects: true }
                 }
 
                 // Losing focus to something else (a launcher, a lock) abandons the shot,
@@ -345,7 +410,7 @@ Scope {
                     }
                     case Qt.Key_Return:
                     case Qt.Key_Enter:
-                        if (window.picking)
+                        if (window.picking && sampler.ready)
                             shot.commitColor(loupe.hex);
                         else if (window.selecting)
                             shot.commit(window, window.shown);
@@ -360,35 +425,55 @@ Scope {
                 }
 
                 // The frozen capture, painted once into a canvas as well so a pixel can
-                // be read back for the color pick.
-                Canvas {
+                // be read back for the color pick. A full-size paint, so only in Color.
+                Loader {
                     id: sampler
                     anchors.fill: parent
                     z: -1
-                    renderTarget: Canvas.Image
-                    renderStrategy: Canvas.Immediate
-                    canvasSize: Qt.size(Math.round(content.width * window.screen.devicePixelRatio), Math.round(content.height * window.screen.devicePixelRatio))
-                    property bool ready: false
-                    onImageLoaded: {
-                        const ctx = getContext("2d");
-                        ctx.drawImage(window.frozen, 0, 0, canvasSize.width, canvasSize.height);
-                        ready = true;
-                    }
-                    Component.onCompleted: if (window.frozen) loadImage(window.frozen)
-                    Connections {
-                        target: window
-                        function onFrozenChanged() {
-                            if (window.frozen)
-                                sampler.loadImage(window.frozen);
-                        }
-                    }
+                    active: shot.mode === "color" && window.frozen !== ""
+
+                    readonly property bool ready: item ? item.ready : false
+
                     function pixel(p) {
-                        if (!ready)
-                            return "#000000";
-                        const dpr = window.screen.devicePixelRatio;
-                        const d = getContext("2d").getImageData(Math.min(canvasSize.width - 1, Math.floor(p.x * dpr)), Math.min(canvasSize.height - 1, Math.floor(p.y * dpr)), 1, 1).data;
-                        const hex = n => (n < 16 ? "0" : "") + n.toString(16);
-                        return "#" + hex(d[0]) + hex(d[1]) + hex(d[2]);
+                        return item ? item.pixel(p) : "#000000";
+                    }
+
+                    sourceComponent: Canvas {
+                        renderTarget: Canvas.Image
+                        renderStrategy: Canvas.Immediate
+                        canvasSize: Qt.size(Math.round(content.width * window.screen.devicePixelRatio), Math.round(content.height * window.screen.devicePixelRatio))
+                        property bool ready: false
+                        property string source: window.frozen
+                        // Before the canvas is available there is no context to draw into;
+                        // onAvailableChanged comes back for it.
+                        function draw() {
+                            if (!available)
+                                return;
+                            const ctx = getContext("2d");
+                            ctx.drawImage(source, 0, 0, canvasSize.width, canvasSize.height);
+                            ready = true;
+                        }
+                        // A cache hit is ready at once and never signals imageLoaded.
+                        function load() {
+                            ready = false;
+                            if (!source)
+                                return;
+                            loadImage(source);
+                            if (isImageLoaded(source))
+                                draw();
+                        }
+                        onImageLoaded: if (!ready && source && isImageLoaded(source)) draw()
+                        onAvailableChanged: if (available && !ready && source && isImageLoaded(source)) draw()
+                        onSourceChanged: load()
+                        Component.onCompleted: load()
+                        function pixel(p) {
+                            if (!ready)
+                                return "#000000";
+                            const dpr = window.screen.devicePixelRatio;
+                            const d = getContext("2d").getImageData(Math.min(canvasSize.width - 1, Math.floor(p.x * dpr)), Math.min(canvasSize.height - 1, Math.floor(p.y * dpr)), 1, 1).data;
+                            const hex = n => (n < 16 ? "0" : "") + n.toString(16);
+                            return "#" + hex(d[0]) + hex(d[1]) + hex(d[2]);
+                        }
                     }
                 }
 
@@ -396,8 +481,28 @@ Scope {
                     id: frozenImage
                     anchors.fill: parent
                     source: window.frozen
-                    cache: false
+                    asynchronous: true
                     fillMode: Image.Stretch
+                    // The content only shows once this decodes, so a capture that never
+                    // will would leave an invisible overlay holding the keyboard and pointer.
+                    onStatusChanged: if (status === Image.Error) {
+                        console.warn("shot: could not load the capture", source);
+                        shot.cancel();
+                    }
+                }
+
+                // What gets grabbed at physical size for the crop, on the real rect. It sits
+                // under the dim, where it looks like the capture around it; the undimmed
+                // view on top is the cutout, which may still be gliding.
+                Cutout {
+                    id: crop
+                    x: window.shown.x
+                    y: window.shown.y
+                    width: window.shown.width
+                    height: window.shown.height
+                    visible: window.selecting
+                    source: window.frozen
+                    full: Qt.size(content.width, content.height)
                 }
 
                 Rectangle {
@@ -405,7 +510,7 @@ Scope {
                     color: Qt.alpha(Theme.colors.surface, window.picking ? 0.15 : 0.6)
 
                     Behavior on color {
-                        ColorAnim { fast: true }
+                        ColorAnim {}
                     }
                 }
 
@@ -481,34 +586,24 @@ Scope {
                     }
                 }
 
-                // The undimmed selection: a clipped view of the frozen capture, and what
-                // gets grabbed at physical size for the crop.
-                Item {
-                    id: crop
-                    x: window.shown.x
-                    y: window.shown.y
-                    width: window.shown.width
-                    height: window.shown.height
-                    clip: true
+                // The undimmed selection, where the highlight is drawn.
+                Cutout {
+                    id: cutout
+                    x: window.drawnX
+                    y: window.drawnY
+                    width: window.drawnWidth
+                    height: window.drawnHeight
                     visible: window.selecting
-
-                    Image {
-                        x: -crop.x
-                        y: -crop.y
-                        width: content.width
-                        height: content.height
-                        source: window.frozen
-                        cache: false
-                        fillMode: Image.Stretch
-                    }
+                    source: window.frozen
+                    full: Qt.size(content.width, content.height)
                 }
 
                 Rectangle {
                     readonly property int weight: shot.flashing ? 4 : 2
-                    x: crop.x - weight
-                    y: crop.y - weight
-                    width: crop.width + 2 * weight
-                    height: crop.height + 2 * weight
+                    x: cutout.x - weight
+                    y: cutout.y - weight
+                    width: cutout.width + 2 * weight
+                    height: cutout.height + 2 * weight
                     visible: window.selecting
                     color: "transparent"
                     border.width: weight
@@ -522,8 +617,8 @@ Scope {
 
                 Rectangle {
                     visible: window.selecting && !window.wholeScreen
-                    x: Math.min(crop.x + crop.width + 8, content.width - width - 8)
-                    y: Math.min(crop.y + crop.height + 8, content.height - height - 8)
+                    x: Math.min(cutout.x + cutout.width + 8, content.width - width - 8)
+                    y: Math.min(cutout.y + cutout.height + 8, content.height - height - 8)
                     width: size.implicitWidth + 16
                     height: size.implicitHeight + 8
                     radius: height / 2
@@ -550,7 +645,8 @@ Scope {
                             return;
                         }
                         if (shot.mode === "color" && shot.frozen) {
-                            shot.commitColor(sampler.pixel(Qt.point(mouse.x, mouse.y)));
+                            if (sampler.ready)
+                                shot.commitColor(sampler.pixel(Qt.point(mouse.x, mouse.y)));
                             return;
                         }
                         if (shot.mode !== "region" || !shot.frozen)
@@ -591,7 +687,7 @@ Scope {
                     opacity: window.dragging || shot.flashing ? 0.25 : 1
 
                     Behavior on opacity {
-                        Anim { effects: true; fast: true }
+                        Anim { effects: true }
                     }
 
                     Row {

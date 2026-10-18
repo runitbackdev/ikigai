@@ -4,19 +4,39 @@ import QtQuick
 // The sidebar: notification history under a do-not-disturb toggle and a clear button,
 // then a month calendar. Hangs out of the frame's right border; Bar draws it as a blob
 // and, while it is open, takes input over the whole screen so a click elsewhere closes it.
+// Bar sizes the blob by `reveal`, and the content slides with the blob's left edge.
 Item {
     id: sidebar
 
     property bool active: true
     readonly property bool open: active && Notifs.sidebarOpen
     readonly property int pad: Math.round(16 * Config.scale)
+    property real reveal: open ? 1 : 0
 
     width: Math.round(360 * Config.scale)
-    opacity: open ? 1 : 0
-    visible: opacity > 0
+    opacity: Math.max(0, Math.min(1, reveal * 2))
+    visible: reveal > 0
+    clip: true
 
-    Behavior on opacity {
-        Anim { effects: true }
+    Behavior on reveal {
+        Anim {}
+    }
+
+    // Clear fades the list out first, rather than fifty rows leaving at once, and empties
+    // it while hidden; the list comes back once the rows are gone.
+    Timer {
+        id: clearing
+        interval: Motion.defaultEffects
+        onTriggered: {
+            Notifs.clear();
+            settle.restart();
+        }
+    }
+
+    Timer {
+        id: settle
+        interval: Motion.fastEffects
+        onTriggered: list.emptying = false
     }
 
     Column {
@@ -26,6 +46,10 @@ Item {
             margins: sidebar.pad
         }
         spacing: sidebar.pad
+        // Held at rest while the blob overshoots, so its left edge isn't clipped.
+        transform: Translate {
+            x: Math.max(0, 1 - sidebar.reveal) * (sidebar.width + 50)
+        }
 
         Item {
             id: header
@@ -59,7 +83,10 @@ Item {
 
                 BarButton {
                     visible: Notifs.history.length > 0
-                    onClicked: Notifs.clear()
+                    onClicked: {
+                        list.emptying = true;
+                        clearing.restart();
+                    }
 
                     Glyph {
                         anchors.centerIn: parent
@@ -73,12 +100,44 @@ Item {
 
         ListView {
             id: list
+
+            // Mid-clear: hidden, and its rows leave without their exit.
+            property bool emptying: false
+
             width: parent.width
             height: parent.height - header.height - calendar.height - 2 * column.spacing
             clip: true
             spacing: Math.round(8 * Config.scale)
+            maximumFlickVelocity: 3000
+            opacity: emptying ? 0 : 1
             model: ScriptModel {
                 values: Notifs.history
+            }
+
+            Behavior on opacity {
+                Anim { effects: true }
+            }
+
+            add: Transition {
+                Anim { property: "opacity"; from: 0; to: 1; effects: true }
+                Anim { property: "scale"; from: 0.8; to: 1 }
+            }
+
+            // Shrinks rather than slides: sliding sideways would poke past the panel.
+            remove: Transition {
+                enabled: !list.emptying
+                Anim { property: "opacity"; to: 0; effects: true }
+                Anim { property: "scale"; to: 0.6; standard: true }
+            }
+
+            // Settle anything a cut-short add left half faded.
+            displaced: Transition {
+                Anim { property: "y" }
+                Anim { properties: "opacity,scale"; to: 1; effects: true }
+            }
+
+            rebound: Transition {
+                Anim { properties: "x,y" }
             }
 
             Text {
@@ -105,6 +164,7 @@ Item {
                 StateLayer {
                     radius: parent.radius
                     hovered: entryHover.hovered
+                    pressed: entryMouse.pressed
                 }
 
                 HoverHandler {
@@ -112,6 +172,7 @@ Item {
                 }
 
                 MouseArea {
+                    id: entryMouse
                     anchors.fill: parent
                     onClicked: Notifs.remove(entry.modelData)
                 }

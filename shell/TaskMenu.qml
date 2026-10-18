@@ -4,7 +4,8 @@ import QtQuick
 PopupCard {
     id: menu
 
-    readonly property var entries: task ? build(task, Bridge.workspaces) : []
+    // Rebuilt on every workspace event, so only while the card is up.
+    readonly property var entries: live && task ? build(task, Bridge.workspaces) : []
     // The app's tray menu, folded in below its own entries: for Discord that is mute,
     // deafen and quit, which have nowhere else to go now the tray icon is gone.
     readonly property var trayItem: task ? Tray.itemFor(task.appId) : null

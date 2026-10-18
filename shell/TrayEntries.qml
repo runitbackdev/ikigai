@@ -35,13 +35,73 @@ Item {
         panels = next.slice(0, stack.length);
     }
 
-    onStackChanged: panels = panels.slice(0, stack.length)
+    // The columns drawn, by depth: the open ones, then any just folded, still fading out
+    // while the card draws its blob back in. The model only grows and shrinks at its tail,
+    // so the columns that stay open aren't rebuilt and don't replay their entrance.
+    property var drawn: []
 
-    implicitWidth: columns.childrenRect.width
-    implicitHeight: columns.childrenRect.height
+    onStackChanged: {
+        panels = panels.slice(0, stack.length);
+        let k = 0;
+        while (k < stack.length && k < drawn.length && drawn[k] === stack[k])
+            k++;
+        if (k === stack.length) {
+            // Folded back: the rest fade, and a reopened one comes back from its fade.
+            for (let i = 0; i < drawn.length; i++)
+                columnModel.setProperty(i, "folding", i >= k);
+            if (drawn.length > k)
+                fold.restart();
+            return;
+        }
+        // Gone before the handles move, so no column on its way out opens another menu.
+        for (let i = 0; i < k; i++)
+            columnModel.setProperty(i, "folding", false);
+        if (columnModel.count > k)
+            columnModel.remove(k, columnModel.count - k);
+        drawn = stack.slice();
+        for (let i = k; i < stack.length; i++)
+            columnModel.append({ folding: false });
+    }
+
+    // Done fading: the folded columns go.
+    function drop() {
+        if (columnModel.count > stack.length)
+            columnModel.remove(stack.length, columnModel.count - stack.length);
+        drawn = drawn.slice(0, stack.length);
+    }
+
+    // Sized by the open columns alone, so the card shrinks while a folded one fades. The
+    // Repeater among the children has no `folding`.
+    implicitWidth: {
+        let w = first.width;
+        for (const c of columns.children)
+            if (c.folding === false)
+                w = Math.max(w, c.x + c.width);
+        return w;
+    }
+    implicitHeight: {
+        let h = first.height;
+        for (const c of columns.children)
+            if (c.folding === false)
+                h = Math.max(h, c.y + c.height);
+        return h;
+    }
 
     function reset() {
         stack = [];
+        fold.stop();
+        drop();
+    }
+
+    Timer {
+        id: fold
+        // The longer of the two fades, in case it was still coming in.
+        interval: Motion.slowEffects
+        onTriggered: list.drop()
+    }
+
+    ListModel {
+        id: columnModel
     }
 
     component Level: Column {
@@ -51,6 +111,8 @@ Item {
         property int depth: 0
         // The column this one opened from, for lining up with its open entry.
         property var above: null
+        // Folded, fading out until it goes.
+        property bool folding: false
         readonly property int count: opener.children.values.length
         // Where the open entry starts, from the entries before it: 32 a row, 9 a separator.
         readonly property real openY: {
@@ -75,7 +137,7 @@ Item {
         y: above ? above.y + above.openY : 0
 
         function place() {
-            if (depth === 0 || !list.card)
+            if (depth === 0 || folding || !list.card)
                 return;
             const p = list.mapToItem(list.card, x, y);
             list.setPanel(depth, Qt.rect(p.x - list.margin, p.y - list.margin, width + 2 * list.margin, height + 2 * list.margin));
@@ -84,6 +146,7 @@ Item {
         onYChanged: place()
         onWidthChanged: place()
         onHeightChanged: place()
+        onFoldingChanged: place()
         Component.onCompleted: place()
 
         QsMenuOpener {
@@ -172,7 +235,7 @@ Item {
 
                 MouseArea {
                     anchors.fill: parent
-                    enabled: !entry.modelData.isSeparator && entry.available
+                    enabled: !entry.modelData.isSeparator && entry.available && !level.folding
                     onClicked: {
                         if (entry.modelData.hasChildren) {
                             // Again on the open one folds it back.
@@ -198,15 +261,33 @@ Item {
 
         Repeater {
             id: opened
-            model: list.stack
+            model: columnModel
 
             Level {
-                required property var modelData
-                required property int index
+                id: column
 
-                handle: modelData
+                required property int index
+                required property var model
+                property bool up: false
+
+                handle: list.drawn[index] ?? null
                 depth: index + 1
+                folding: model.folding
                 above: index === 0 ? first : opened.itemAt(index - 1)
+                // Grows out of the entry that opened it. Scale leaves x, y and size alone,
+                // so the panel reported for it is the settled one from the start.
+                transformOrigin: Item.TopLeft
+                opacity: up && !folding ? 1 : 0
+                Component.onCompleted: up = true
+
+                Behavior on opacity {
+                    Anim { effects: true; slow: !column.folding }
+                }
+
+                Anim on scale {
+                    from: 0.8
+                    to: 1
+                }
             }
         }
     }

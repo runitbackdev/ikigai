@@ -1,17 +1,34 @@
 import QtQuick
 
 // A red dot and the elapsed time while a recording runs; click to stop. Takes no room
-// otherwise.
+// otherwise. Grows and shrinks, its gap above the clock included, so the cluster above
+// slides to make room rather than jumping; the badge stays put and the edge uncovers it.
 Item {
     id: badge
 
+    readonly property int gap: 8
+
     implicitWidth: Theme.barWidth
-    implicitHeight: Recorder.recording ? column.implicitHeight : 0
-    visible: Recorder.recording
+    implicitHeight: Recorder.recording ? column.implicitHeight + gap : 0
+    opacity: Recorder.recording ? 1 : 0
+    visible: implicitHeight > 0
+    clip: true
+
+    Behavior on implicitHeight {
+        Anim { standard: true }
+    }
+
+    Behavior on opacity {
+        Anim { effects: true }
+    }
 
     Column {
         id: column
-        anchors.horizontalCenter: parent.horizontalCenter
+        anchors {
+            horizontalCenter: parent.horizontalCenter
+            bottom: parent.bottom
+            bottomMargin: badge.gap
+        }
         spacing: 2
 
         Rectangle {
@@ -39,7 +56,7 @@ Item {
     }
 
     MouseArea {
-        anchors.fill: parent
+        anchors.fill: column
         cursorShape: Qt.PointingHandCursor
         onClicked: Recorder.stop()
     }

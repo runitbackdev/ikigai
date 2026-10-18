@@ -17,13 +17,19 @@ Rectangle {
     color: primary ? Theme.colors.primary : Theme.colors.surfaceContainerHigh
     opacity: enabled ? 1 : 0.5
 
-    Text {
+    Behavior on color {
+        ColorAnim {}
+    }
+
+    Behavior on opacity {
+        Anim { effects: true }
+    }
+
+    Words {
         id: text
         anchors.centerIn: parent
         text: pill.label
         color: pill.primary ? Theme.colors.primaryFg : Theme.colors.primary
-        font.family: Theme.fontFamily
-        font.pointSize: Theme.fontSize
         font.weight: Font.Medium
     }
 

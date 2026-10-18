@@ -63,7 +63,14 @@ Item {
         }
     }
 
+    // Grows in on the first unread and shrinks away once the sidebar has been seen. It
+    // keeps the last count while it shrinks, rather than showing a 0 on the way out.
     Rectangle {
+        readonly property int unread: Notifs.unread
+        property int count: unread
+
+        onUnreadChanged: if (unread > 0) count = unread
+
         anchors {
             top: parent.top
             right: parent.right
@@ -74,12 +81,22 @@ Item {
         height: Math.round(16 * Config.scale)
         radius: height / 2
         color: Theme.colors.primary
-        visible: Notifs.unread > 0
+        visible: opacity > 0
+        scale: unread > 0 ? 1 : 0
+        opacity: unread > 0 ? 1 : 0
+
+        Behavior on scale {
+            Anim { fast: true }
+        }
+
+        Behavior on opacity {
+            Anim { effects: true }
+        }
 
         Text {
             id: badge
             anchors.centerIn: parent
-            text: Notifs.unread > 99 ? "99+" : Notifs.unread
+            text: parent.count > 99 ? "99+" : parent.count
             color: Theme.colors.primaryFg
             font.family: Theme.fontFamily
             font.pointSize: Theme.fontSize - 4

@@ -32,11 +32,26 @@ ShellRoot {
             WlrLayershell.namespace: "ikigai:greeter"
             color: Theme.colors.surface
 
+            // Decoded at the screen's size, not the file's, and faded in once ready.
             Image {
+                // Fades in on the first decode only; a later resize (output waking in another
+                // mode, a scale change) re-decodes behind the old frame instead of blanking.
+                property bool loaded: false
+
                 anchors.fill: parent
-                source: "file:///usr/local/share/ikigai/theme/wallpaper.jpg"
+                // Held back until the surface has its size, else the first decode is the
+                // full file anyway, or runs at zero height, and the resize decodes it again.
+                source: width > 0 && height > 0 ? "file:///usr/local/share/ikigai/theme/wallpaper.jpg" : ""
+                sourceSize: Qt.size(width, height)
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
+                retainWhileLoading: true
+                opacity: loaded ? 1 : 0
+                onStatusChanged: if (status === Image.Ready) loaded = true
+
+                Behavior on opacity {
+                    Anim { effects: true; slow: true }
+                }
             }
 
             Loader {

@@ -149,44 +149,50 @@ PanelWindow {
             }
 
             BlobRect {
+                id: cardBlob
+
+                // Reaches a fifth further under the rail, so the squash of a vertical slide
+                // can't pull the card's edge off the rail.
+                readonly property real under: popouts.base.width * 0.2
+
                 group: blobs
-                x: popouts.x + (popouts.card ? popouts.base.x : -50)
+                x: popouts.x + (popouts.card ? popouts.base.x - under : -50)
                 y: popouts.card ? popouts.base.y : 0
-                implicitWidth: popouts.card ? popouts.base.width : 0
+                implicitWidth: popouts.card ? popouts.base.width + under : 0
                 implicitHeight: popouts.card ? popouts.base.height : 0
                 radius: Theme.cardRadius
-                deformScale: 0.15 / 10000
+                deformScale: (popouts.current ? 0.15 : 0.1) / 10000
             }
 
-            // A menu's open submenus, one panel each beside the card.
+            // A menu's open submenus, one panel each beside the card. By count: the rects
+            // change every frame the card moves, and a blob rebuilt each frame loses its wobble.
             Repeater {
-                model: popouts.panels
+                model: popouts.panels.length
 
                 BlobRect {
-                    required property var modelData
+                    required property int index
+                    readonly property rect panel: popouts.panels[index] ?? Qt.rect(0, 0, 0, 0)
+
                     group: blobs
-                    x: popouts.x + modelData.x
-                    y: modelData.y
-                    implicitWidth: modelData.width
-                    implicitHeight: modelData.height
+                    x: popouts.x + panel.x
+                    y: panel.y
+                    implicitWidth: panel.width
+                    implicitHeight: panel.height
                     radius: Theme.cardRadius
                     deformScale: 0.15 / 10000
                 }
             }
 
-            // The toast sheet, oversized upward so it hangs out of the top border.
+            // The toast sheet, oversized upward so it hangs out of the top border. Toasts
+            // eases the extent and clips its rows to it, so the edge reveals them.
             BlobRect {
                 group: blobs
                 x: toasts.x
                 y: toasts.y - 50
-                implicitWidth: toasts.width
-                implicitHeight: toasts.visible && toasts.height > 0 ? toasts.height + 50 : 0
+                implicitWidth: toasts.extent > 0 ? toasts.width : 0
+                implicitHeight: toasts.extent
                 radius: Theme.cardRadius
                 deformScale: 0.15 / 10000
-
-                Behavior on implicitHeight {
-                    Anim {}
-                }
             }
 
             // The OSD, oversized downward into the border, its bottom edge pinned.
@@ -195,13 +201,9 @@ PanelWindow {
                 x: osd.x
                 y: osd.y + osd.height + 50 - implicitHeight
                 implicitWidth: osd.width
-                implicitHeight: Osd.shown ? osd.height + 50 : 0
+                implicitHeight: Math.max(0, osd.reveal * (osd.height + 50))
                 radius: Theme.cardRadius
                 deformScale: 0.15 / 10000
-
-                Behavior on implicitHeight {
-                    Anim {}
-                }
             }
 
             // The sidebar, oversized rightward into the border, its right edge pinned.
@@ -209,21 +211,17 @@ PanelWindow {
                 group: blobs
                 x: sidebar.x + sidebar.width + 50 - implicitWidth
                 y: sidebar.y
-                implicitWidth: sidebar.open ? sidebar.width + 50 : 0
+                implicitWidth: Math.max(0, sidebar.reveal * (sidebar.width + 50))
                 implicitHeight: sidebar.height
                 radius: Theme.cardRadius
                 deformScale: 0.15 / 10000
-
-                Behavior on implicitWidth {
-                    Anim {}
-                }
             }
         }
 
         Toasts {
             id: toasts
             active: bar.showsToasts
-            visible: !sidebar.open
+            shown: !sidebar.open
             anchors {
                 top: parent.top
                 right: parent.right
@@ -290,7 +288,6 @@ PanelWindow {
                 id: recording
                 anchors {
                     bottom: clock.top
-                    bottomMargin: Recorder.recording ? 8 : 0
                     horizontalCenter: parent.horizontalCenter
                 }
             }
@@ -312,6 +309,7 @@ PanelWindow {
             x: bar.railWidth
             height: parent.height
             hovered: hover.hovered
+            deform: cardBlob.rawDeformMatrix
         }
 
         OsdPill {

@@ -19,8 +19,11 @@ Scope {
     // The last minute, oldest first, each 0..1: the CPU, each core, memory in use, and
     // each GPU by its bus id with its memory.
     property var history: monitor.emptyHistory()
-    readonly property int keep: 60
+    // One past the graphs' 60: the extra is the oldest, sliding off their left edge.
+    readonly property int keep: 61
     property string error: ""
+    // How often the feed samples: faster while Performance's graphs are showing.
+    readonly property int interval: page === "performance" ? 500 : 1000
 
     function emptyHistory() {
         return { cpu: [], cores: [], memory: [], gpus: {}, gpuMemory: {} };
@@ -39,7 +42,7 @@ Scope {
         }
     }
 
-    onPageChanged: request({ request: "interval", ms: page === "performance" ? 500 : 1000 })
+    onIntervalChanged: request({ request: "interval", ms: interval })
 
     IpcHandler {
         target: "monitor"
@@ -69,7 +72,7 @@ Scope {
         stderr: SplitParser {
             onRead: line => console.warn("monitor:", line)
         }
-        onStarted: monitor.request({ request: "interval", ms: monitor.page === "performance" ? 500 : 1000 })
+        onStarted: monitor.request({ request: "interval", ms: monitor.interval })
         onExited: (code, status) => {
             if (monitor.open && !monitor.error)
                 monitor.error = "ikigai-monitor exited with " + code;
@@ -156,7 +159,7 @@ Scope {
             readonly property int pad: Math.round(20 * Config.scale)
 
             Behavior on opacity {
-                Anim { effects: true; fast: true }
+                Anim { effects: true }
             }
 
             // Ctrl+Tab flips the page, Ctrl+1 and Ctrl+2 pick one.
@@ -198,6 +201,10 @@ Scope {
                         radius: height / 2
                         color: current ? Theme.colors.surfaceContainerHigh : "transparent"
 
+                        Behavior on color {
+                            ColorAnim {}
+                        }
+
                         Glyph {
                             id: tabGlyph
                             anchors {
@@ -210,7 +217,7 @@ Scope {
                             color: tab.current ? Theme.colors.primary : Theme.colors.fgVariant
                         }
 
-                        Text {
+                        Words {
                             id: tabLabel
                             anchors {
                                 left: tabGlyph.right
@@ -219,8 +226,6 @@ Scope {
                             }
                             text: tab.modelData.label
                             color: tab.current ? Theme.colors.fg : Theme.colors.fgVariant
-                            font.family: Theme.fontFamily
-                            font.pointSize: Theme.fontSize
                             font.weight: tab.current ? Font.DemiBold : Font.Medium
                         }
 
@@ -274,14 +279,20 @@ Scope {
                 }
             }
 
-            // Before the first sample, or after the feed died.
+            // Before the first sample, or after the feed died; it and the body cross-fade
+            // as the first sample lands.
             Text {
                 anchors.centerIn: parent
-                visible: monitor.sample === null
+                opacity: monitor.sample === null ? 1 : 0
+                visible: opacity > 0
                 text: monitor.error ? monitor.error : "Reading…"
                 color: monitor.error ? Theme.colors.error : Theme.colors.fgVariant
                 font.family: Theme.fontFamily
                 font.pointSize: Theme.fontSize
+
+                Behavior on opacity {
+                    Anim { effects: true }
+                }
             }
 
             Item {
@@ -296,23 +307,48 @@ Scope {
                     topMargin: Math.round(12 * Config.scale)
                     bottomMargin: card.pad
                 }
-                visible: monitor.sample !== null
+                opacity: monitor.sample !== null ? 1 : 0
+                // Shown the moment the sample lands, not once the fade is under way, so the
+                // current page has its focus back from the first frame.
+                visible: monitor.sample !== null || opacity > 0
 
+                Behavior on opacity {
+                    Anim { effects: true }
+                }
+
+                // The pages cross-fade. The incoming one is visible from the start, so it
+                // takes focus at once; the outgoing one stays until it has faded.
                 MonitorProcesses {
+                    readonly property bool current: monitor.page === "processes"
                     anchors.fill: parent
-                    visible: monitor.page === "processes"
-                    focus: visible
+                    opacity: current ? 1 : 0
+                    visible: current || opacity > 0
+                    // The outgoing page is still on screen but no longer takes the pointer.
+                    enabled: current
+                    z: current ? 1 : 0
+                    focus: current
+                    Behavior on opacity {
+                        Anim { effects: true }
+                    }
                     sample: monitor.sample
                     onTerminate: pids => monitor.terminate(pids)
                     onKill: pids => monitor.kill(pids)
                 }
 
                 MonitorPerformance {
+                    readonly property bool current: monitor.page === "performance"
                     anchors.fill: parent
-                    visible: monitor.page === "performance"
-                    focus: visible
+                    opacity: current ? 1 : 0
+                    visible: current || opacity > 0
+                    enabled: current
+                    z: current ? 1 : 0
+                    focus: current
+                    Behavior on opacity {
+                        Anim { effects: true }
+                    }
                     sample: monitor.sample
                     history: monitor.history
+                    interval: monitor.interval
                 }
             }
         }

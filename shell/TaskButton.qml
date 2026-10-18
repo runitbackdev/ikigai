@@ -9,6 +9,9 @@ Item {
     readonly property bool running: task.windows.length > 0
     readonly property bool active: task.windows.some(w => w.states.includes("activated"))
 
+    // Set by TaskGroup's add transition, like BarButton.grow.
+    property real grow: 1
+
     signal menuRequested
     signal windowsRequested
     signal dismissRequested
@@ -19,7 +22,14 @@ Item {
     scale: press.pressed ? 0.88 : 1
 
     Behavior on scale {
-        Anim { fast: true }
+        Anim {}
+    }
+
+    transform: Scale {
+        origin.x: button.width / 2
+        origin.y: button.height / 2
+        xScale: button.grow
+        yScale: button.grow
     }
 
     StateLayer {
@@ -33,10 +43,6 @@ Item {
         size: Theme.iconSize
         fill: button.active
         color: button.active ? Theme.colors.primary : button.running ? Theme.colors.fg : Theme.colors.fgVariant
-
-        Behavior on color {
-            ColorAnim { fast: true }
-        }
     }
 
     // What the app wants noticed, in the corner of its glyph: how many notifications
@@ -45,6 +51,7 @@ Item {
     Rectangle {
         readonly property int count: Notifs.unreadFor(button.task.appId)
         readonly property bool trayed: Tray.itemFor(button.task.appId) !== null
+        readonly property bool shown: count > 0 || trayed
         readonly property int side: Math.round((count > 0 ? 13 : 6) * Config.scale)
 
         anchors {
@@ -53,11 +60,21 @@ Item {
             rightMargin: 1
             bottomMargin: 1
         }
-        visible: count > 0 || trayed
+        visible: opacity > 0
+        scale: shown ? 1 : 0
+        opacity: shown ? 1 : 0
         width: count > 0 ? Math.max(side, label.implicitWidth + 6) : side
         height: side
         radius: height / 2
         color: count > 0 ? Theme.colors.primary : Theme.colors.fgVariant
+
+        Behavior on scale {
+            Anim { fast: true }
+        }
+
+        Behavior on opacity {
+            Anim { effects: true }
+        }
 
         Behavior on width {
             Anim { fast: true }
@@ -68,7 +85,7 @@ Item {
         }
 
         Behavior on color {
-            ColorAnim { fast: true }
+            ColorAnim {}
         }
 
         Text {

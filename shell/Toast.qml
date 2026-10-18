@@ -6,8 +6,8 @@ import QtQuick.Effects
 // One row of the toast sheet: icon, app, summary, body, image, actions. Clicking invokes
 // the app's default action or dismisses; middle-click, the corner X, or a swipe to the
 // right always dismisses. The timer pauses under the pointer and never runs for critical
-// urgency. Leaves by fading, then tells the server, so the app hears expired or dismissed
-// only once the row is gone.
+// urgency. Slides in from the screen edge it hangs from and leaves back toward it, fading,
+// then tells the server, so the app hears expired or dismissed only once the row is gone.
 //
 // The image hint is a portrait or a picture: a chat app sends the sender's avatar, a
 // screenshot tool sends the capture. A wide one is a banner under the text; anything
@@ -34,34 +34,57 @@ Item {
     }
     readonly property int closeSize: Math.round(20 * Config.scale)
     property bool leaving: false
+    // Closed from the app's side: an invoked action, a withdrawn or replaced notification.
+    property bool gone: false
 
     width: Math.round(340 * Config.scale)
     height: column.implicitHeight + 2 * pad
     opacity: leaving ? 0 : 1
 
     Behavior on opacity {
-        Anim { effects: true; fast: true }
+        Anim { effects: true }
     }
 
+    // Out the way it came, or on the way it was thrown, while the row fades.
     function close(dismissed) {
         if (leaving)
             return;
         leaving = true;
+        sheet.x = toast.width;
         exit.dismissed = dismissed;
         exit.restart();
     }
 
-    // The sheet keeps sliding the way it was thrown while the row fades.
-    function swipeOut() {
-        sheet.x = toast.width;
-        close(true);
+    Component.onCompleted: {
+        sheet.x = 0;
+        Notifs.hold(n);
+    }
+    Component.onDestruction: Notifs.release(n, gone)
+
+    // The server drops a closed notification at once; held, it lasts out the slide.
+    RetainableLock {
+        object: toast.n
+        locked: true
+    }
+
+    // The app closed it, so it leaves the same way, with nothing left to tell the server.
+    Connections {
+        target: toast.n
+        function onClosed() {
+            toast.gone = true;
+            toast.close(false);
+        }
     }
 
     Timer {
         id: exit
         property bool dismissed: false
-        interval: Motion.fastEffects
-        onTriggered: exit.dismissed ? toast.n.dismiss() : toast.n.expire()
+        interval: Motion.standard
+        onTriggered: {
+            if (!toast.gone)
+                exit.dismissed ? toast.n.dismiss() : toast.n.expire();
+            Notifs.forget(toast.n);
+        }
     }
 
     Timer {
@@ -95,7 +118,7 @@ Item {
             if (active || toast.leaving)
                 return;
             if (sheet.x > toast.width / 3 || centroid.velocity.x > 800)
-                toast.swipeOut();
+                toast.close(true);
             else
                 sheet.x = 0;
         }
@@ -103,13 +126,17 @@ Item {
 
     Item {
         id: sheet
+        // Starts out past the edge, beyond the stack's clip, and slides in.
+        x: toast.width
         width: parent.width
         height: parent.height
         clip: true
 
+        // Springing back past 0 would jut out of the sheet's left edge; the slide in and out
+        // shares it, so it lands without bouncing off that edge either.
         Behavior on x {
             enabled: !drag.active
-            Anim { fast: true }
+            Anim { standard: true }
         }
 
         // The tint fills the row and is cut by the sheet's shape: drawn taller than the
@@ -144,7 +171,7 @@ Item {
             opacity: hover.hovered ? 1 : 0
 
             Behavior on opacity {
-                Anim { effects: true; fast: true }
+                Anim { effects: true }
             }
 
             StateLayer {
