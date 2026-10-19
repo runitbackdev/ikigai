@@ -18,8 +18,10 @@ Singleton {
 
     readonly property var items: SystemTray.items.values
 
-    // Items that get no slot at all: the launcher's, since Super is its button.
-    readonly property var hidden: ["vicinae"]
+    // Items that get no slot at all: the launcher's, since Super is its button, and ones
+    // that only need to run, not be seen. KeePassXC keeps its icon on so it still has a
+    // tray to minimize into; Vicinae brings its window back. NetBird is `netbird up`.
+    readonly property var hidden: ["vicinae", "keepassxc", "netbird"]
 
     // Items no rail button stands for: these keep their own slot above the clock.
     readonly property var loose: items.filter(item => root.ownerOf(item) === "" && !root.isHidden(item))
