@@ -16,6 +16,11 @@ greeter sync are unchanged at those revs. Rebased again on 2026-09-29 (cosmic-co
 smithay 3b133491 upstream, cosmic-protocols c0cff4db unchanged, xdg-desktop-portal-cosmic
 38ddd40b, cosmic-settings-daemon f22461b1): of the ten cosmic-comp commits only 50c170c3
 touches a fork commit, see the autoscroll entry; the Smithay fork is a plain mirror now.
+Rebased again on 2026-10-31 (cosmic-comp eeca8b09, past epoch-1.11.0, smithay 8a27023 as upstream
+pins it; the portal and daemon forks untouched, the flake installs nixpkgs' 1.11.0 of both): the
+Smithay-pin commit is gone, upstream's own pin is past the merged fix; upstream grouped cursor
+hiding into `cursor_hide` and reworked the cursor module, which only moved the pan-cursor
+test; the build moved from make to just. Nothing upstream since touches an entry below.
 
 ## cosmic-comp
 
@@ -159,9 +164,9 @@ X11 backend then takes RandR output 0 as the only display: with the primary at 2
 never showed on the primary. `xrandr --output DP-2 --primary` on `:0` is the
 session-local workaround; the game must be restarted to re-enumerate.
 
-Fix on the fork 2026-10-27, not yet pushed: on `OutputUnknown` retry every 100 ms for up
-to 3 s, replacing any pending retry. Worth sending upstream; the cleaner version lets
-Smithay report RandR output changes so the compositor re-applies on the event.
+Fixed on the fork 2026-10-31: on `OutputUnknown` retry every 100 ms for up to 3 s,
+replacing any pending retry. Not sent upstream yet; the cleaner version lets Smithay
+report RandR output changes so the compositor re-applies on the event.
 
 ### Not yet diagnosed
 
