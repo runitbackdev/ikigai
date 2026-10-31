@@ -147,6 +147,22 @@ Fixed on the fork 2026-09-15: layer surfaces take the keyboard's output too, the
 pointer's only when nothing has focus. The card holds exclusive focus while it drops,
 so Vicinae lands on it. One line. Not sent upstream yet.
 
+### The Xwayland primary is lost after an output comes back
+
+`update_xwayland_primary_output` (`src/xwayland.rs`) runs as soon as an output is
+(re)added, but Xwayland learns of the wl_output over the wire and has no RandR output
+by that name yet, so Smithay's `set_randr_primary_output` fails with "The provided
+output wasn't known to Xwayland" and nothing tries again. Every wake from sleep on this
+box logs it three or four times and the X screen has no primary until re-login. Unity's
+X11 backend then takes RandR output 0 as the only display: with the primary at 2560,0
+(DP-3 at the origin) CRACK's cursor was drawn against a screen that ends at 2560 and
+never showed on the primary. `xrandr --output DP-2 --primary` on `:0` is the
+session-local workaround; the game must be restarted to re-enumerate.
+
+Fix on the fork 2026-10-27, not yet pushed: on `OutputUnknown` retry every 100 ms for up
+to 3 s, replacing any pending retry. Worth sending upstream; the cleaner version lets
+Smithay report RandR output changes so the compositor re-applies on the event.
+
 ### Not yet diagnosed
 
 - `Failed to render texture ..., import for wrong devices DrmNode { ty: Render }` in the
