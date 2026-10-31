@@ -3,7 +3,7 @@
 # fetchgit rather than fetchFromGitHub so the hash is the tree's and the fetch is a
 # clone, which works from behind proxies that block the archive endpoint. Bump rev,
 # hash and cargoHash together: `nix build .#cosmic-comp` reports each mismatch.
-{ cosmic-comp, fetchgit, rustPlatform }:
+{ cosmic-comp, fetchgit, rustPlatform, stdenv }:
 cosmic-comp.overrideAttrs (finalAttrs: old: {
   version = "1.8.0-ikigai";
   src = fetchgit {
@@ -20,6 +20,15 @@ cosmic-comp.overrideAttrs (finalAttrs: old: {
   postPatch = (old.postPatch or "") + ''
     substituteInPlace Cargo.toml --replace-fail 'lto = "fat"' 'lto = "thin"'
   '';
+  # nixpkgs' package installs with `just` since cosmic-comp 1.11; the fork's branch is
+  # epoch-1.8.0, which has a Makefile and no justfile, so install the way nixpkgs did for
+  # 1.9: `make install` with the same two variables.
+  dontUseJustInstall = true;
+  dontCargoInstall = true;
+  makeFlags = [
+    "prefix=${placeholder "out"}"
+    "CARGO_TARGET_DIR=target/${stdenv.hostPlatform.rust.cargoShortTarget}"
+  ];
   # Upstream's update script keys on epoch tags; the fork has none.
   passthru = (old.passthru or { }) // { updateScript = null; };
 })
