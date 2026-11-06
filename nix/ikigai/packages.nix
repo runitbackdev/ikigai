@@ -40,6 +40,7 @@ in
       zed
       zed-editor
       discord
+      discord-canary
       pear-desktop
       docker-compose
       lazydocker
